@@ -101,6 +101,10 @@
       <excludeFolder url="file://$MODULE_DIR$/backend/vendor/willdurand/negotiation" />
       <excludeFolder url="file://$MODULE_DIR$/backend/vendor/api-platform/graphql" />
       <excludeFolder url="file://$MODULE_DIR$/backend/vendor/webonyx/graphql-php" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/public/bundles" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/var" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/frontend/.output" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
