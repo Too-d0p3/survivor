@@ -17,7 +17,14 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
     '@vueuse/nuxt',
     '@nuxtjs/apollo',
+    '@hey-api/nuxt'
   ],
+  heyApi: {
+    config: {
+      input: 'http://localhost:8000/api/docs.jsonopenapi', // nebo cesta k tvé OpenAPI specifikaci
+      output: 'types/api',
+    },
+  },
   css: ['~/assets/css/main.css'],
   ssr: false,
 })

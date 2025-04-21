@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Creates a user token.
+         * @description Creates a user token.
+         */
+        post: operations["login_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tests": {
         parameters: {
             query?: never;
@@ -54,6 +74,58 @@ export interface paths {
          * @description Updates the Test resource.
          */
         patch: operations["api_tests_id_patch"];
+        trace?: never;
+    };
+    "/api/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieves the collection of User resources.
+         * @description Retrieves the collection of User resources.
+         */
+        get: operations["api_users_get_collection"];
+        put?: never;
+        /**
+         * Creates a User resource.
+         * @description Creates a User resource.
+         */
+        post: operations["api_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieves a User resource.
+         * @description Retrieves a User resource.
+         */
+        get: operations["api_users_id_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Removes the User resource.
+         * @description Removes the User resource.
+         */
+        delete: operations["api_users_id_delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Updates the User resource.
+         * @description Updates the User resource.
+         */
+        patch: operations["api_users_id_patch"];
         trace?: never;
     };
 }
@@ -163,6 +235,29 @@ export interface components {
             readonly "@type"?: string;
             readonly id?: number;
         };
+        User: {
+            readonly id?: number;
+            email?: string;
+            roles?: string[];
+            password?: string;
+            readonly userIdentifier?: string;
+        };
+        "User.jsonld": {
+            readonly "@context"?: string | ({
+                "@vocab": string;
+                /** @enum {string} */
+                hydra: "http://www.w3.org/ns/hydra/core#";
+            } & {
+                [key: string]: unknown;
+            });
+            readonly "@id"?: string;
+            readonly "@type"?: string;
+            readonly id?: number;
+            email?: string;
+            roles?: string[];
+            password?: string;
+            readonly userIdentifier?: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -172,6 +267,36 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The login data */
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description User token created */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        readonly token: string;
+                    };
+                };
+            };
+        };
+    };
     api_tests_get_collection: {
         parameters: {
             query?: {
@@ -367,6 +492,238 @@ export interface operations {
                 };
                 content: {
                     "application/ld+json": components["schemas"]["Test.jsonld"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["Error.jsonld"];
+                    "application/problem+json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["Error.jsonld"];
+                    "application/problem+json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An error occurred */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["ConstraintViolation.jsonld-jsonld"];
+                    "application/problem+json": components["schemas"]["ConstraintViolation-json"];
+                    "application/json": components["schemas"]["ConstraintViolation-json"];
+                };
+            };
+        };
+    };
+    api_users_get_collection: {
+        parameters: {
+            query?: {
+                /** @description The collection page number */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User collection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": {
+                        member: components["schemas"]["User.jsonld"][];
+                        totalItems?: number;
+                        /** @example {
+                         *       "@id": "string",
+                         *       "type": "string",
+                         *       "first": "string",
+                         *       "last": "string",
+                         *       "previous": "string",
+                         *       "next": "string"
+                         *     } */
+                        view?: {
+                            /** Format: iri-reference */
+                            "@id"?: string;
+                            "@type"?: string;
+                            /** Format: iri-reference */
+                            first?: string;
+                            /** Format: iri-reference */
+                            last?: string;
+                            /** Format: iri-reference */
+                            previous?: string;
+                            /** Format: iri-reference */
+                            next?: string;
+                        };
+                        search?: {
+                            "@type"?: string;
+                            template?: string;
+                            variableRepresentation?: string;
+                            mapping?: {
+                                "@type"?: string;
+                                variable?: string;
+                                property?: string | null;
+                                required?: boolean;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+    };
+    api_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The new User resource */
+        requestBody: {
+            content: {
+                "application/ld+json": components["schemas"]["User.jsonld"];
+            };
+        };
+        responses: {
+            /** @description User resource created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["User.jsonld"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["Error.jsonld"];
+                    "application/problem+json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An error occurred */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["ConstraintViolation.jsonld-jsonld"];
+                    "application/problem+json": components["schemas"]["ConstraintViolation-json"];
+                    "application/json": components["schemas"]["ConstraintViolation-json"];
+                };
+            };
+        };
+    };
+    api_users_id_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User identifier */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User resource */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["User.jsonld"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["Error.jsonld"];
+                    "application/problem+json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    api_users_id_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User identifier */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User resource deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["Error.jsonld"];
+                    "application/problem+json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    api_users_id_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User identifier */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description The updated User resource */
+        requestBody: {
+            content: {
+                "application/merge-patch+json": components["schemas"]["User"];
+            };
+        };
+        responses: {
+            /** @description User resource updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/ld+json": components["schemas"]["User.jsonld"];
                 };
             };
             /** @description Invalid input */

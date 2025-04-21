@@ -109,6 +109,11 @@
       <path value="$PROJECT_DIR$/backend/vendor/symfony/property-access" />
       <path value="$PROJECT_DIR$/backend/vendor/webonyx/graphql-php" />
       <path value="$PROJECT_DIR$/backend/vendor/api-platform/graphql" />
+      <path value="$PROJECT_DIR$/backend/vendor/lexik/jwt-authentication-bundle" />
+      <path value="$PROJECT_DIR$/backend/vendor/lcobucci/clock" />
+      <path value="$PROJECT_DIR$/backend/vendor/lcobucci/jwt" />
+      <path value="$PROJECT_DIR$/backend/vendor/symfony/http-client" />
+      <path value="$PROJECT_DIR$/backend/vendor/symfony/http-client-contracts" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.4">
