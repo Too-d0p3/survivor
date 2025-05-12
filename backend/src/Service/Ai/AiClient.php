@@ -11,7 +11,7 @@ class AiClient
     public function __construct(
         private HttpClientInterface $httpClient,
         private EntityManagerInterface $em,
-        private string              $baseUrl = 'http://192.168.1.125:1234/v1/chat/completions', // nebo uprav podle LM studia
+        private string              $baseUrl = 'http://192.168.1.155:1234/v1/chat/completions', // nebo uprav podle LM studia
         private string $aiModelName = 'local', //TMP
     )
     {

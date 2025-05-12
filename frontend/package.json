@@ -14,26 +14,26 @@
     "migrate": "docker-compose exec php php bin/console make:migration && docker-compose exec php php bin/console doctrine:migrations:migrate -n && npm run generate-client"
   },
   "dependencies": {
-    "@apollo/client": "^3.13.8",
+    "@apollo/client": "^3.13.7",
     "@hey-api/client-nuxt": "^0.4.0",
     "@hey-api/nuxt": "^0.1.5",
-    "@nuxt/fonts": "^0.11.3",
+    "@nuxt/fonts": "^0.11.1",
     "@nuxt/image": "^1.10.0",
-    "@nuxt/ui": "^3.1.1",
+    "@nuxt/ui": "^3.0.2",
     "@pinia/nuxt": "^0.11.0",
     "@vueuse/nuxt": "^13.1.0",
-    "graphql": "^16.11.0",
-    "nuxt": "^3.17.2",
+    "graphql": "^16.10.0",
+    "nuxt": "^3.16.2",
     "pinia": "^3.0.2",
     "vue": "^3.5.13",
-    "vue-router": "^4.5.1"
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "@graphql-codegen/cli": "^5.0.6",
-    "@graphql-codegen/client-preset": "^4.8.1",
-    "@hey-api/openapi-ts": "^0.67.3",
+    "@graphql-codegen/cli": "5.0.5",
+    "@graphql-codegen/client-preset": "4.8.0",
+    "@hey-api/openapi-ts": "^0.66.5",
     "@nuxtjs/apollo": "^5.0.0-alpha.14",
-    "openapi-typescript": "^7.8.0",
+    "openapi-typescript": "^7.6.1",
     "ts-node": "^10.9.2"
   }
 }
