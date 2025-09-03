@@ -1,64 +1,46 @@
 import { useCookie } from '#app'
-import {client} from '@/types/api/client.gen';
-import type { GetCurrentUserResponse } from '@/types/api/index';
-import { getCurrentUser } from '@/types/api/index';
 
 export function useAuth() {
-    const token = useCookie('token')
+    const token = useCookie<string | null>('token')  // přežije F5
+    const user = useState<any | null>('user', () => null)
     const isAuthenticated = computed(() => !!token.value)
-    const user = useState<GetCurrentUserResponse | null>('user', () => null);
+
+    const { $api } = useNuxtApp()
 
     async function login(email: string, password: string) {
         try {
-            const response = await $fetch<{ token: string }>('/api/login', {
+            const { token: newToken } = await $api<{ token: string }>('/login', {
                 method: 'POST',
-                body: { email, password },
+                body: { email, password }
             })
-            token.value = response.token
-            client.setConfig({
-                headers: {
-                    'Authorization': `Bearer ${token.value}`
-                }
-            })
-            await fetchUser();
+            token.value = newToken
+            await fetchUser()
             return true
-        } catch (error) {
-            console.error('Login failed:', error)
+        } catch (err) {
+            console.error('Login failed:', err)
             return false
         }
     }
 
     async function logout() {
         token.value = null
-        client.setConfig({
-            headers: {}
-        })
+        user.value = null
         await navigateTo('/login')
-        user.value = null;
     }
 
     async function fetchUser() {
         if (!token.value) {
-            user.value = null;
-            return;
+            user.value = null
+            return
         }
         try {
-            const fetchedUser = await getCurrentUser({
-                composable: "$fetch",
-            });
-            user.value = fetchedUser;
-        } catch (error) {
-            console.error('Failed to fetch user:', error);
-            token.value = null;
-            user.value = null;
+            user.value = await $api('/user/me')
+        } catch (err) {
+            console.error('Failed to fetch user:', err)
+            // token.value = null
+            // user.value = null
         }
     }
 
-    return {
-        isAuthenticated,
-        login,
-        logout,
-        user,
-        fetchUser,
-    }
+    return { token, user, isAuthenticated, login, logout, fetchUser }
 }

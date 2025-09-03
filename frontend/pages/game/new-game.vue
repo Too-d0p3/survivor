@@ -1,12 +1,13 @@
 <script setup>
 import {useGameStore} from "~/stores/game.js";
-import {apiTraitDefsGetCollection} from '~/types/api';
+
+const { $api } = useNuxtApp()
 
 const gameStore = useGameStore();
 
-const {status, data: traits, refresh} = await apiTraitDefsGetCollection({
-  composable: "useFetch"
-});
+const traits = await $api('/trait-def');
+console.log(traits);
+debugger;
 
 </script>
 

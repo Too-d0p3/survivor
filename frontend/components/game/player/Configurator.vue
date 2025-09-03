@@ -1,6 +1,7 @@
 <script setup>
 import {useGameStore} from "~/stores/game.js";
-import {client} from "~/types/api/client.gen.js";
+
+const { $api } = useNuxtApp();
 
 const props = defineProps({
   traits: Array,
@@ -28,8 +29,8 @@ const formState = ref({
 
 const handleSubmit = async (event) => {
   state.playerTraits.loading = true;
-  const res = client.post({
-    composable: "$fetch",
+  const res = $api({
+    method: "post",
     url: '/api/game/player/traits/generate',
     body: {
       description: formState.value.characterDescription,

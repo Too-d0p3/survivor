@@ -1,5 +1,5 @@
 export default defineNuxtRouteMiddleware((to, from) => {
-    const token = useCookie('token')
+    const token = useCookie('token');
     const publicPages = ['/login', '/login/register'] // Stránky přístupné nepřihlášeným
 
     // Pokud je uživatel přihlášen a snaží se jít na login/register, přesměruj na /

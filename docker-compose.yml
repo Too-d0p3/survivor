@@ -24,7 +24,7 @@ services:
       - php
 
   db:
-    image: postgres:17.5
+    image: postgres:17.6
     container_name: survivor_db
     environment:
       POSTGRES_DB: survivor
