@@ -2,7 +2,7 @@
 
 namespace App\Domain\Ai;
 
-use App\Domain\AiLog\AiLog;
+use App\Domain\Ai\Log\AiLog;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
