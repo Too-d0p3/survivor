@@ -2,12 +2,11 @@
 
 namespace App\Domain\User;
 
+use App\Domain\User\Exceptions\CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException;
 use App\Dto\RegisterInput;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\AsController;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -15,14 +14,18 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[AsController]
 class AuthController
 {
+
+    public function __construct(
+        private UserFacade $userFacade
+    )
+    {
+    }
+
     #[Route('/api/register', name: 'api_register', methods: ['POST'])]
     public function register(
         Request $request,
         SerializerInterface $serializer,
         ValidatorInterface $validator,
-        EntityManagerInterface $em,
-        UserPasswordHasherInterface $passwordHasher,
-        UserRepository $userRepository
     ): JsonResponse {
         $data = $request->getContent();
 
@@ -39,17 +42,11 @@ class AuthController
             return new JsonResponse(['errors' => $errorMessages], 400);
         }
 
-        if ($userRepository->findOneBy(['email' => $input->email])) {
+        try {
+            $this->userFacade->registerUser($input->getEmail(), $input->getPassword());
+        } catch (CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException $e) {
             return new JsonResponse(['error' => 'User with this email already exists'], 409);
         }
-
-        $user = new User();
-        $user->setEmail($input->email);
-        $hashedPassword = $passwordHasher->hashPassword($user, $input->password);
-        $user->setPassword($hashedPassword);
-
-        $em->persist($user);
-        $em->flush();
 
         return new JsonResponse(['message' => 'User registered successfully']);
     }
