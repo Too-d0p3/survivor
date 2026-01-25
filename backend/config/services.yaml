@@ -3,6 +3,9 @@
 
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
+imports:
+    - { resource: sample_data.yaml }
+
 parameters:
 
 services:
@@ -10,6 +13,10 @@ services:
     _defaults:
         autowire: true      # Automatically injects dependencies in your services.
         autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+
+    _instanceof:
+        App\Shared\SampleData\SampleData:
+            tags: [ 'app.shared.sample_data' ]
 
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
@@ -19,6 +26,11 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+
+    App\Shared\SampleData\:
+        resource: '../src/Shared/SampleData/'
+        autowire: true
+        autoconfigure: true
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

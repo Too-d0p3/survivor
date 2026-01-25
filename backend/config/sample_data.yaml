@@ -1,0 +1,4 @@
+parameters:
+  app_sample_data:
+    order:
+      - App\Domain\User\UserSampleData
