@@ -1,4 +1,5 @@
 parameters:
   app_sample_data:
     order:
+      - App\Domain\TraitDef\TraitDefSampleData
       - App\Domain\User\UserSampleData
