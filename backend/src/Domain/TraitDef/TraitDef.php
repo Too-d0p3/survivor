@@ -2,9 +2,6 @@
 
 namespace App\Domain\TraitDef;
 
-use App\Domain\Player\Trait\PlayerTrait;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -18,6 +15,7 @@ class TraitDef
     public const TYPE_EMOTIONAL = 'emotional';
     public const TYPE_PHYSICAL = 'physical';
 
+    //TODO enum
     public const ALLOWED_TYPES = [
         self::TYPE_SOCIAL,
         self::TYPE_STRATEGIC,
@@ -32,26 +30,31 @@ class TraitDef
 
     #[ORM\Column(length: 100, unique: true)] // Klíč by měl být unikátní
     #[Assert\NotBlank]
-    private ?string $key = null;
+    private string $key;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
-    private ?string $label = null;
+    private string $label;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $description = null;
+    private string $description;
 
     #[ORM\Column(length: 50)]
     #[Assert\Choice(choices: self::ALLOWED_TYPES, message: 'Invalid trait type.')]
     #[Assert\NotBlank]
-    private ?string $type = null;
+    private string $type;
 
-    #[ORM\OneToMany(mappedBy: 'traitDef', targetEntity: PlayerTrait::class, orphanRemoval: true)]
-    private Collection $playerTraits;
-
-    public function __construct()
+    public function __construct(
+        string $key,
+        string $label,
+        string $description,
+        string $type,
+    )
     {
-        $this->playerTraits = new ArrayCollection();
+        $this->key = $key;
+        $this->label = $label;
+        $this->description = $description;
+        $this->setType($type);
     }
 
     public function getId(): ?int
@@ -59,45 +62,27 @@ class TraitDef
         return $this->id;
     }
 
-    public function getKey(): ?string
+    public function getKey(): string
     {
         return $this->key;
     }
 
-    public function setKey(string $key): static
-    {
-        $this->key = $key;
-        return $this;
-    }
-
-    public function getLabel(): ?string
+    public function getLabel(): string
     {
         return $this->label;
     }
 
-    public function setLabel(string $label): static
-    {
-        $this->label = $label;
-        return $this;
-    }
-
-    public function getDescription(): ?string
+    public function getDescription(): string
     {
         return $this->description;
     }
 
-    public function setDescription(?string $description): static
-    {
-        $this->description = $description;
-        return $this;
-    }
-
-    public function getType(): ?string
+    public function getType(): string
     {
         return $this->type;
     }
 
-    public function setType(string $type): static
+    private function setType(string $type): static
     {
         if (!in_array($type, self::ALLOWED_TYPES)) {
             throw new \InvalidArgumentException("Invalid trait type");
@@ -106,31 +91,4 @@ class TraitDef
         return $this;
     }
 
-    /**
-     * @return Collection<int, PlayerTrait>
-     */
-    public function getPlayerTraits(): Collection
-    {
-        return $this->playerTraits;
-    }
-
-    public function addPlayerTrait(PlayerTrait $playerTrait): static
-    {
-        if (!$this->playerTraits->contains($playerTrait)) {
-            $this->playerTraits->add($playerTrait);
-            $playerTrait->setTraitDef($this);
-        }
-        return $this;
-    }
-
-    public function removePlayerTrait(PlayerTrait $playerTrait): static
-    {
-        if ($this->playerTraits->removeElement($playerTrait)) {
-            // set the owning side to null (unless already changed)
-            if ($playerTrait->getTraitDef() === $this) {
-                $playerTrait->setTraitDef(null);
-            }
-        }
-        return $this;
-    }
 } 
