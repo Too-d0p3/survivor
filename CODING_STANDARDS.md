@@ -354,7 +354,23 @@ final class PlayerService
 | `create*()` | `T` | Factory method |
 | `apply*()`, `execute*()` | `void` or Result | State mutation / action |
 
-### 9.2 Interfaces
+### 9.2 No Abbreviations in Names
+
+Variables, properties, parameters, methods, and classes use full descriptive names. No abbreviations.
+
+```php
+// Wrong
+$em, $repo, $desc, $cfg, $msg, $btn, $idx, $cnt, $tmp
+$playerRepo, $traitDesc
+
+// Right
+$entityManager, $repository, $description, $configuration, $message, $button, $index, $count, $temporary
+$playerRepository, $traitDescription
+```
+
+Well-established acronyms that are more recognizable than their expansions are acceptable: `$id`, `$url`, `$html`, `$json`, `$dto`, `$api`, `$jwt`.
+
+### 9.3 Interfaces
 
 No `I` prefix, no `Interface` suffix. Implementations use a descriptive prefix:
 
@@ -363,7 +379,7 @@ PlayerRepository           ← interface
 DoctrinePlayerRepository   ← implementation
 ```
 
-### 9.3 Exceptions
+### 9.4 Exceptions
 
 `Cannot[Action]Because[Reason]Exception` — fully self-documenting:
 
@@ -372,7 +388,7 @@ CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException
 CannotStartGameBecauseNotEnoughPlayersException
 ```
 
-### 9.4 Domain Directory Structure
+### 9.5 Domain Directory Structure
 
 Each domain lives in `src/Domain/{DomainName}/` and contains its own:
 

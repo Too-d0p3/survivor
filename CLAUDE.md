@@ -89,6 +89,13 @@ docker-compose exec php composer stan
 ```
 PHPStan runs at level max with strict rules. Existing violations are captured in `phpstan-baseline.neon` — new code must not introduce new errors. To regenerate the baseline (e.g. after fixing baselined errors), run `docker-compose exec php composer stan:baseline`.
 
+## Commit Messages
+
+- **Subject line only** — no commit description/body
+- **Imperative mood** — e.g. "add player endpoint", not "added player endpoint"
+- **No abbreviations** — use full words (e.g. "introduce" not "intro", "configuration" not "config")
+- **Lowercase** — do not capitalize the first letter
+
 ## Key Entities and Relationships
 
 - **User** → owns many **Games**
