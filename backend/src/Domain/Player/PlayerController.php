@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domain\Player;
 
-use App\Domain\Player\Trait\PlayerTrait;
-use App\Domain\TraitDef\TraitDefRepository;
 use App\Domain\User\User;
 use App\Dto\Game\Player\GenerateTraitsInput;
 use App\Shared\Controller\AbstractApiController;
@@ -16,13 +14,13 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-class PlayerController extends AbstractApiController
+final class PlayerController extends AbstractApiController
 {
-    private PlayerService $playerService;
+    private readonly PlayerFacade $playerFacade;
 
-    public function __construct(PlayerService $playerService)
+    public function __construct(PlayerFacade $playerFacade)
     {
-        $this->playerService = $playerService;
+        $this->playerFacade = $playerFacade;
     }
 
     #[Route('/api/game/player/traits/generate', name: 'game_player_traits_generate', methods: ['POST'])]
@@ -32,17 +30,19 @@ class PlayerController extends AbstractApiController
         SerializerInterface $serializer,
         ValidatorInterface $validator,
     ): JsonResponse {
-        if (!$user) {
+        if ($user === null) {
             return $this->json(['message' => 'Not authenticated'], 401);
         }
 
         [$input, $errors] = $this->getValidatedDto($request, GenerateTraitsInput::class, $serializer, $validator);
 
-        if ($errors) {
+        if ($errors !== []) {
             return $this->json(['errors' => $errors], 400);
         }
 
-        $result = $this->playerService->generatePlayerTraitsFromDescription($input->description);
+        assert($input instanceof GenerateTraitsInput);
+
+        $result = $this->playerFacade->generatePlayerTraitsFromDescription($input->description);
 
         return $this->json($result);
     }
@@ -55,28 +55,15 @@ class PlayerController extends AbstractApiController
     public function generateSummaryDescription(
         #[CurrentUser] ?User $user,
         Request $request,
-        SerializerInterface $serializer,
-        ValidatorInterface $validator,
-        TraitDefRepository $traitDefRepository,
     ): JsonResponse {
-        if (!$user) {
+        if ($user === null) {
             return $this->json(['message' => 'Not authenticated'], 401);
         }
 
-        $userTraits = json_decode($request->getContent(), true);
+        /** @var array<string, string> $traitStrengths */
+        $traitStrengths = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
-        $traits = $traitDefRepository->findAll();
-
-        $playerTraits = [];
-
-        foreach ($traits as $trait) {
-            $playerTrait = new PlayerTrait();
-            $playerTrait->setTraitDef($trait);
-            $playerTrait->setStrength($userTraits[$trait->getKey()] ?? 0);
-            $playerTraits[] = $playerTrait;
-        }
-
-        $result = $this->playerService->generatePlayerTraitsSummaryDescription($playerTraits);
+        $result = $this->playerFacade->generatePlayerTraitsSummaryDescription($traitStrengths);
 
         return $this->json($result);
     }

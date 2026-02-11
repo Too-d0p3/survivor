@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domain\Ai;
 
-use App\Domain\Ai\AiClient;
-use App\Domain\Player\Trait\PlayerTrait;
 use App\Domain\TraitDef\TraitDef;
+use DateTimeImmutable;
 
-class AiPlayerService
+final class AiPlayerFacade
 {
-    private AiClient $aiClient;
+    private readonly AiClient $aiClient;
 
     public function __construct(AiClient $aiClient)
     {
@@ -23,7 +22,7 @@ class AiPlayerService
      */
     public function generatePlayerTraitsFromDescription(string $description, array $traits): array
     {
-        $traitsString = '[' . implode(', ', array_map(fn($trait) => $trait->getKey(), $traits)) . ']';
+        $traitsString = sprintf('[%s]', implode(', ', array_map(fn(TraitDef $trait) => $trait->getKey(), $traits)));
 
         $systemPrompt = <<<PROMPT
 Jsi systém pro generování psychologických charakteristik hráčů reality show Survivor.
@@ -52,31 +51,32 @@ PROMPT;
 
 
         $messages = [
-            ['role' => 'user', 'content' => $description]
+            ['role' => 'user', 'content' => $description],
         ];
 
-        $response = $this->aiClient->ask('generatePlayerTraitsFromDescription', $systemPrompt, $messages);
+        $now = new DateTimeImmutable();
+        $response = $this->aiClient->ask('generatePlayerTraitsFromDescription', $systemPrompt, $messages, $now);
+        assert(is_array($response));
 
         return $response;
     }
 
     /**
-     * @param array<int, PlayerTrait> $playerTraits
+     * @param array<string, string> $traitStrengths
      * @return array<string, mixed>
      */
-    public function generatePlayerTraitsSummaryDescription(array $playerTraits): array
+    public function generatePlayerTraitsSummaryDescription(array $traitStrengths): array
     {
         $content = '';
 
-        /** @var $trait PlayerTrait */
-        foreach ($playerTraits as $trait) {
-            $content .= $trait->getTraitDef()->getKey() . ": " . $trait->getStrength() . PHP_EOL;
+        foreach ($traitStrengths as $key => $strength) {
+            $content .= sprintf("%s: %s\n", $key, $strength);
         }
 
         $systemPrompt = <<<PROMPT
 Jsi systém pro generování popisu psychologické charakteristiky hráče reality show Survivor.
 
-Na základě předaných charakterových vlastností a jejich hodnot (0.0–1.0) vygeneruj krátké shrnutí hráčovy osobnosti ve formě jednoho až dvou **jasně oddělených vět**. Nepoužívej středník – věty ukončuj běžnou tečkou. Shrnutí napiš lidským jazykem. 
+Na základě předaných charakterových vlastností a jejich hodnot (0.0–1.0) vygeneruj krátké shrnutí hráčovy osobnosti ve formě jednoho až dvou **jasně oddělených vět**. Nepoužívej středník – věty ukončuj běžnou tečkou. Shrnutí napiš lidským jazykem.
 
 ⚠️ Důležité instrukce:
 - Odpověz výhradně **validním JSON objektem** s následující strukturou:
@@ -89,10 +89,12 @@ PROMPT;
 
 
         $messages = [
-            ['role' => 'user', 'content' => $content]
+            ['role' => 'user', 'content' => $content],
         ];
 
-        $response = $this->aiClient->ask('generatePlayerTraitsSummaryDescription', $systemPrompt, $messages);
+        $now = new DateTimeImmutable();
+        $response = $this->aiClient->ask('generatePlayerTraitsSummaryDescription', $systemPrompt, $messages, $now);
+        assert(is_array($response));
 
         return $response;
     }

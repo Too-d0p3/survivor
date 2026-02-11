@@ -9,20 +9,20 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/trait-def', name: 'trait-def_')]
-class TraitDefController extends AbstractApiController
+final class TraitDefController extends AbstractApiController
 {
-    private TraitDefRepository $traitDefRepository;
+    private readonly TraitDefFacade $traitDefFacade;
 
-    public function __construct(TraitDefRepository $traitDefRepository)
+    public function __construct(TraitDefFacade $traitDefFacade)
     {
-        $this->traitDefRepository = $traitDefRepository;
+        $this->traitDefFacade = $traitDefFacade;
     }
 
     #[Route('/', name: '', methods: ['GET'])]
     public function traitDefAction(): JsonResponse
     {
         return $this->json(
-            $this->traitDefRepository->findAll(),
+            $this->traitDefFacade->getAll(),
             200,
             ['Content-Type' => 'application/json; charset=utf-8'],
         );

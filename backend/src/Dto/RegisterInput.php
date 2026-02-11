@@ -6,7 +6,7 @@ namespace App\Dto;
 
 use Symfony\Component\Validator\Constraints as Assert;
 
-class RegisterInput
+final readonly class RegisterInput
 {
     #[Assert\NotBlank]
     #[Assert\Email]
@@ -16,13 +16,11 @@ class RegisterInput
     #[Assert\Length(min: 6)]
     public string $password;
 
-    public function getEmail(): string
-    {
-        return $this->email;
-    }
-
-    public function getPassword(): string
-    {
-        return $this->password;
+    public function __construct(
+        string $email = '',
+        string $password = '',
+    ) {
+        $this->email = $email;
+        $this->password = $password;
     }
 }

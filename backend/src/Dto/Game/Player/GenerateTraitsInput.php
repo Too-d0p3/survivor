@@ -6,8 +6,14 @@ namespace App\Dto\Game\Player;
 
 use Symfony\Component\Validator\Constraints as Assert;
 
-class GenerateTraitsInput
+final readonly class GenerateTraitsInput
 {
     #[Assert\NotBlank]
     public string $description;
+
+    public function __construct(
+        string $description = '',
+    ) {
+        $this->description = $description;
+    }
 }

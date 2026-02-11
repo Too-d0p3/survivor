@@ -23,12 +23,13 @@ abstract class AbstractApiController extends AbstractController
         $data = $request->getContent();
 
         $dto = $serializer->deserialize($data, $dtoClass, 'json');
+        assert(is_object($dto));
         $errors = $validator->validate($dto);
 
         if (count($errors) > 0) {
             $errorMessages = [];
             foreach ($errors as $error) {
-                $errorMessages[] = $error->getPropertyPath() . ': ' . $error->getMessage();
+                $errorMessages[] = sprintf('%s: %s', $error->getPropertyPath(), $error->getMessage());
             }
 
             return [null, $errorMessages];

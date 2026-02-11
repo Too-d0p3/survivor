@@ -10,9 +10,9 @@ use Throwable;
 
 class CannotCreateTraitDefBecauseTraitDefWithSameKeyAlreadyExistsException extends RuntimeException
 {
-    private string $key;
+    private readonly string $key;
 
-    private TraitDef $existingTraitDef;
+    private readonly TraitDef $existingTraitDef;
 
     public function __construct(
         string $key,
@@ -25,7 +25,7 @@ class CannotCreateTraitDefBecauseTraitDefWithSameKeyAlreadyExistsException exten
         parent::__construct(
             sprintf(
                 'Cannot create trait definition with key `%s`'
-                . ' because trait definition `%i` with same key already exist',
+                . ' because trait definition `%d` with same key already exists',
                 $key,
                 $this->existingTraitDef->getId(),
             ),

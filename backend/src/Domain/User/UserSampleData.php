@@ -6,9 +6,9 @@ namespace App\Domain\User;
 
 use App\Shared\SampleData\SampleData;
 
-class UserSampleData implements SampleData
+final class UserSampleData implements SampleData
 {
-    private UserFacade $userFacade;
+    private readonly UserFacade $userFacade;
 
     public function __construct(UserFacade $userFacade)
     {

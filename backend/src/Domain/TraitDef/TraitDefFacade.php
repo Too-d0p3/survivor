@@ -7,11 +7,11 @@ namespace App\Domain\TraitDef;
 use App\Domain\TraitDef\Exceptions\CannotCreateTraitDefBecauseTraitDefWithSameKeyAlreadyExistsException;
 use Doctrine\ORM\EntityManagerInterface;
 
-class TraitDefFacade
+final class TraitDefFacade
 {
-    private TraitDefRepository $traitDefRepository;
+    private readonly TraitDefRepository $traitDefRepository;
 
-    private EntityManagerInterface $entityManager;
+    private readonly EntityManagerInterface $entityManager;
 
     public function __construct(
         TraitDefRepository $traitDefRepository,
@@ -21,12 +21,19 @@ class TraitDefFacade
         $this->entityManager = $entityManager;
     }
 
+    /**
+     * @return array<int, TraitDef>
+     */
+    public function getAll(): array
+    {
+        return array_values($this->traitDefRepository->findAll());
+    }
 
     public function createTraitDef(
         string $key,
         string $label,
         string $description,
-        string $type,
+        TraitType $type,
     ): TraitDef {
         $existingTraitDef = $this->traitDefRepository->findOneBy(['key' => $key]);
 

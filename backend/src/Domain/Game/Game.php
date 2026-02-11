@@ -6,67 +6,40 @@ namespace App\Domain\Game;
 
 use App\Domain\Player\Player;
 use App\Domain\User\User;
-use DateTime;
-use DateTimeInterface;
+use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: GameRepository::class)]
-class Game
+final class Game
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(type: Types::DATETIME_MUTABLE)]
-    private ?DateTimeInterface $createdAt = null;
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    private DateTimeImmutable $createdAt;
 
     #[ORM\Column]
-    private ?bool $isSandbox = null;
+    private bool $isSandbox;
 
+    /** @var Collection<int, Player> */
     #[ORM\OneToMany(mappedBy: 'game', targetEntity: Player::class, orphanRemoval: true)]
     private Collection $players;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(nullable: false)] // pokud má každá hra vždy autora
-    private ?User $owner = null;
+    #[ORM\JoinColumn(nullable: false)]
+    private User $owner;
 
-    public function __construct()
+    public function __construct(User $owner, bool $isSandbox, DateTimeImmutable $createdAt)
     {
-        $this->players = new ArrayCollection();
-        $this->createdAt = new DateTime();
-    }
-
-    public function getId(): ?int
-    {
-        return $this->id;
-    }
-
-    public function getCreatedAt(): ?DateTimeInterface
-    {
-        return $this->createdAt;
-    }
-
-    public function isIsSandbox(): ?bool
-    {
-        return $this->isSandbox;
-    }
-
-    public function setIsSandbox(bool $isSandbox): static
-    {
+        $this->owner = $owner;
         $this->isSandbox = $isSandbox;
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Player>
-     */
-    public function getPlayers(): Collection
-    {
-        return $this->players;
+        $this->createdAt = $createdAt;
+        $this->players = new ArrayCollection();
     }
 
     public function addPlayer(Player $player): static
@@ -81,21 +54,40 @@ class Game
 
     public function removePlayer(Player $player): static
     {
-        if ($this->players->removeElement($player)) {
-            if ($player->getGame() === $this) {
-                $player->setGame(null);
-            }
-        }
+        $this->players->removeElement($player);
 
         return $this;
     }
 
-    public function getOwner(): ?User
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getCreatedAt(): DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function isSandbox(): bool
+    {
+        return $this->isSandbox;
+    }
+
+    /**
+     * @return array<int, Player>
+     */
+    public function getPlayers(): array
+    {
+        return $this->players->toArray();
+    }
+
+    public function getOwner(): User
     {
         return $this->owner;
     }
 
-    public function setOwner(?User $owner): static
+    public function setOwner(User $owner): static
     {
         $this->owner = $owner;
         return $this;

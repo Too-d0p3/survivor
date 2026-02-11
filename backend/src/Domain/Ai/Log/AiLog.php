@@ -9,7 +9,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: AiLogRepository::class)]
-class AiLog
+final class AiLog
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -17,25 +17,25 @@ class AiLog
     private ?int $id = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
-    private ?DateTimeImmutable $createdAt = null;
+    private DateTimeImmutable $createdAt;
 
     #[ORM\Column(length: 255)]
-    private ?string $modelName = null;
+    private string $modelName;
 
     #[ORM\Column(length: 512, nullable: true)]
-    private ?string $apiUrl = null;
+    private ?string $apiUrl;
 
     #[ORM\Column(length: 255, nullable: true)]
-    private ?string $actionName = null;
+    private ?string $actionName;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $userPrompt = null;
+    private ?string $userPrompt;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $systemPrompt = null;
+    private ?string $systemPrompt;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $requestJson = null;
+    private ?string $requestJson;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $responseJson = null;
@@ -44,11 +44,31 @@ class AiLog
     private ?string $returnContent = null;
 
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
-    private ?int $duration = null; // Duration in milliseconds
+    private ?int $duration = null;
 
-    public function __construct()
+    public function __construct(
+        string $modelName,
+        DateTimeImmutable $createdAt,
+        ?string $apiUrl = null,
+        ?string $actionName = null,
+        ?string $userPrompt = null,
+        ?string $systemPrompt = null,
+        ?string $requestJson = null,
+    ) {
+        $this->modelName = $modelName;
+        $this->createdAt = $createdAt;
+        $this->apiUrl = $apiUrl;
+        $this->actionName = $actionName;
+        $this->userPrompt = $userPrompt;
+        $this->systemPrompt = $systemPrompt;
+        $this->requestJson = $requestJson;
+    }
+
+    public function recordResponse(string $responseJson, int $duration, string $returnContent): void
     {
-        $this->createdAt = new DateTimeImmutable();
+        $this->responseJson = $responseJson;
+        $this->duration = $duration;
+        $this->returnContent = $returnContent;
     }
 
     public function getId(): ?int
@@ -56,21 +76,14 @@ class AiLog
         return $this->id;
     }
 
-    public function getCreatedAt(): ?DateTimeImmutable
+    public function getCreatedAt(): DateTimeImmutable
     {
         return $this->createdAt;
     }
 
-    public function getModelName(): ?string
+    public function getModelName(): string
     {
         return $this->modelName;
-    }
-
-    public function setModelName(string $modelName): static
-    {
-        $this->modelName = $modelName;
-
-        return $this;
     }
 
     public function getApiUrl(): ?string
@@ -78,23 +91,9 @@ class AiLog
         return $this->apiUrl;
     }
 
-    public function setApiUrl(?string $apiUrl): static
-    {
-        $this->apiUrl = $apiUrl;
-
-        return $this;
-    }
-
     public function getActionName(): ?string
     {
         return $this->actionName;
-    }
-
-    public function setActionName(?string $actionName): static
-    {
-        $this->actionName = $actionName;
-
-        return $this;
     }
 
     public function getUserPrompt(): ?string
@@ -102,23 +101,9 @@ class AiLog
         return $this->userPrompt;
     }
 
-    public function setUserPrompt(?string $userPrompt): static
-    {
-        $this->userPrompt = $userPrompt;
-
-        return $this;
-    }
-
     public function getSystemPrompt(): ?string
     {
         return $this->systemPrompt;
-    }
-
-    public function setSystemPrompt(?string $systemPrompt): static
-    {
-        $this->systemPrompt = $systemPrompt;
-
-        return $this;
     }
 
     public function getRequestJson(): ?string
@@ -126,23 +111,9 @@ class AiLog
         return $this->requestJson;
     }
 
-    public function setRequestJson(?string $requestJson): static
-    {
-        $this->requestJson = $requestJson;
-
-        return $this;
-    }
-
     public function getResponseJson(): ?string
     {
         return $this->responseJson;
-    }
-
-    public function setResponseJson(?string $responseJson): static
-    {
-        $this->responseJson = $responseJson;
-
-        return $this;
     }
 
     public function getReturnContent(): ?string
@@ -150,22 +121,8 @@ class AiLog
         return $this->returnContent;
     }
 
-    public function setReturnContent(?string $returnContent): static
-    {
-        $this->returnContent = $returnContent;
-
-        return $this;
-    }
-
     public function getDuration(): ?int
     {
         return $this->duration;
-    }
-
-    public function setDuration(?int $duration): static
-    {
-        $this->duration = $duration;
-
-        return $this;
     }
 }

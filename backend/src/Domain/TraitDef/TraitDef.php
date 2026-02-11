@@ -6,32 +6,17 @@ namespace App\Domain\TraitDef;
 
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-use InvalidArgumentException;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: TraitDefRepository::class)]
-class TraitDef
+final class TraitDef
 {
-    // Konstanta pro typy
-    public const TYPE_SOCIAL = 'social';
-    public const TYPE_STRATEGIC = 'strategic';
-    public const TYPE_EMOTIONAL = 'emotional';
-    public const TYPE_PHYSICAL = 'physical';
-
-    //TODO enum
-    public const ALLOWED_TYPES = [
-        self::TYPE_SOCIAL,
-        self::TYPE_STRATEGIC,
-        self::TYPE_EMOTIONAL,
-        self::TYPE_PHYSICAL,
-    ];
-
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 100, unique: true)] // Klíč by měl být unikátní
+    #[ORM\Column(length: 100, unique: true)]
     #[Assert\NotBlank]
     private string $key;
 
@@ -39,24 +24,22 @@ class TraitDef
     #[Assert\NotBlank]
     private string $label;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[ORM\Column(type: Types::TEXT, nullable: false)]
     private string $description;
 
-    #[ORM\Column(length: 50)]
-    #[Assert\Choice(choices: self::ALLOWED_TYPES, message: 'Invalid trait type.')]
-    #[Assert\NotBlank]
-    private string $type;
+    #[ORM\Column(type: Types::STRING, length: 50, enumType: TraitType::class)]
+    private TraitType $type;
 
     public function __construct(
         string $key,
         string $label,
         string $description,
-        string $type,
+        TraitType $type,
     ) {
         $this->key = $key;
         $this->label = $label;
         $this->description = $description;
-        $this->setType($type);
+        $this->type = $type;
     }
 
     public function getId(): ?int
@@ -79,17 +62,8 @@ class TraitDef
         return $this->description;
     }
 
-    public function getType(): string
+    public function getType(): TraitType
     {
         return $this->type;
-    }
-
-    private function setType(string $type): static
-    {
-        if (!in_array($type, self::ALLOWED_TYPES)) {
-            throw new InvalidArgumentException("Invalid trait type");
-        }
-        $this->type = $type;
-        return $this;
     }
 }

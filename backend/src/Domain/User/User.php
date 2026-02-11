@@ -14,7 +14,7 @@ use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: "app_user")]
-class User implements UserInterface, PasswordAuthenticatedUserInterface
+final class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -24,7 +24,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 180, unique: true)]
     #[Groups(['user:read'])]
-    private ?string $email = null;
+    private string $email;
 
     /** @var array<string> */
     #[ORM\Column]
@@ -32,8 +32,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private array $roles = [];
 
     #[ORM\Column]
-    private ?string $password = null;
+    private string $password = '';
 
+    /** @var Collection<int, Game> */
     #[ORM\OneToMany(targetEntity: Game::class, mappedBy: 'owner', orphanRemoval: true)]
     private Collection $games;
 
@@ -44,18 +45,41 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->games = new ArrayCollection();
     }
 
+    public function eraseCredentials(): void
+    {
+    }
+
+    public function addGame(Game $game): self
+    {
+        if (!$this->games->contains($game)) {
+            $this->games->add($game);
+            $game->setOwner($this);
+        }
+
+        return $this;
+    }
+
+    public function removeGame(Game $game): self
+    {
+        $this->games->removeElement($game);
+
+        return $this;
+    }
+
     public function getId(): ?int
     {
         return $this->id;
     }
 
-    public function getEmail(): ?string
+    public function getEmail(): string
     {
         return $this->email;
     }
 
     public function getUserIdentifier(): string
     {
+        assert($this->email !== '');
+
         return $this->email;
     }
 
@@ -75,43 +99,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->password;
     }
 
+    /**
+     * @return array<int, Game>
+     */
+    public function getGames(): array
+    {
+        return $this->games->toArray();
+    }
+
     public function setPassword(string $password): self
     {
         $this->password = $password;
-        return $this;
-    }
-
-    public function eraseCredentials(): void
-    {
-        // Pokud ukládáš plaintext heslo do nějaké property (např. `plainPassword`), tady ho smaž
-    }
-
-    /**
-     * @return Collection<int, Game>
-     */
-    public function getGames(): Collection
-    {
-        return $this->games;
-    }
-
-    public function addGame(Game $game): self
-    {
-        if (!$this->games->contains($game)) {
-            $this->games->add($game);
-            $game->setOwner($this);
-        }
-
-        return $this;
-    }
-
-    public function removeGame(Game $game): self
-    {
-        if ($this->games->removeElement($game)) {
-            if ($game->getOwner() === $this) {
-                $game->setOwner(null); // pokud povolíš nullable = true
-            }
-        }
-
         return $this;
     }
 }

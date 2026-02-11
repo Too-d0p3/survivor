@@ -9,7 +9,7 @@ use Throwable;
 
 class CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException extends RuntimeException
 {
-    private string $email;
+    private readonly string $email;
 
     public function __construct(
         string $email,

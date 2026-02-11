@@ -14,9 +14,9 @@ use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[AsController]
-class AuthController
+final class AuthController
 {
-    private UserFacade $userFacade;
+    private readonly UserFacade $userFacade;
 
     public function __construct(UserFacade $userFacade)
     {
@@ -38,15 +38,15 @@ class AuthController
         if (count($errors) > 0) {
             $errorMessages = [];
             foreach ($errors as $error) {
-                $errorMessages[] = $error->getPropertyPath() . ': ' . $error->getMessage();
+                $errorMessages[] = sprintf('%s: %s', $error->getPropertyPath(), $error->getMessage());
             }
 
             return new JsonResponse(['errors' => $errorMessages], 400);
         }
 
         try {
-            $this->userFacade->registerUser($input->getEmail(), $input->getPassword());
-        } catch (CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException $e) {
+            $this->userFacade->registerUser($input->email, $input->password);
+        } catch (CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException) {
             return new JsonResponse(['error' => 'User with this email already exists'], 409);
         }
 

@@ -5,104 +5,123 @@ declare(strict_types=1);
 namespace App\Domain\Ai;
 
 use App\Domain\Ai\Log\AiLog;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use RuntimeException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-class AiClient
+final class AiClient
 {
-    private HttpClientInterface $httpClient;
+    private readonly HttpClientInterface $httpClient;
 
-    private EntityManagerInterface $em;
+    private readonly EntityManagerInterface $entityManager;
 
-    private string $baseUrl;
+    private readonly string $baseUrl;
 
-    private string $aiModelName;
+    private readonly string $aiModelName;
 
     public function __construct(
         HttpClientInterface $httpClient,
-        EntityManagerInterface $em,
+        EntityManagerInterface $entityManager,
         string $baseUrl = 'http://192.168.1.2:1234/v1/chat/completions',
         string $aiModelName = 'local',
     ) {
         $this->httpClient = $httpClient;
-        $this->em = $em;
+        $this->entityManager = $entityManager;
         $this->baseUrl = $baseUrl;
         $this->aiModelName = $aiModelName;
     }
 
-    public function createAiLog(
-        string $actionName,
-        string $userPrompt,
-        string $systemPrompt,
-        string $requestJson,
-    ): AiLog {
-        $log = new AiLog();
-        $log->setModelName($this->aiModelName); //tmp
-        $log->setApiUrl($this->baseUrl);
-        $log->setActionName($actionName);
-        $log->setUserPrompt($userPrompt);
-        $log->setSystemPrompt($systemPrompt);
-        $log->setRequestJson($requestJson);
-        $this->em->persist($log);
-        $this->em->flush();
-
-        return $log;
-    }
-
     /**
      * @param array<int, array<string, string>> $messages
+     * @return string|array<string, mixed>
      */
     public function ask(
         string $actionName,
         string $systemPrompt,
         array $messages,
+        DateTimeImmutable $createdAt,
         float $temperature = 0.6,
     ): string|array {
         $requestJson = [
-            'model' => 'local-model', // LM Studio model name (pokud je potřeba)
+            'model' => 'local-model',
             'temperature' => $temperature,
             'messages' => array_merge(
                 [['role' => 'system', 'content' => $systemPrompt]],
                 $messages,
-            )
+            ),
         ];
 
-        //TODO array of messages
-        $aiLog = $this->createAiLog($actionName, $messages[0]['content'], $systemPrompt, json_encode($requestJson));
-        $response = $this->httpClient->request('POST', $this->baseUrl, [ 'json' => $requestJson ]);
+        $aiLog = $this->createAiLog(
+            $actionName,
+            $messages[0]['content'],
+            $systemPrompt,
+            json_encode($requestJson, JSON_THROW_ON_ERROR),
+            $createdAt,
+        );
+        $response = $this->httpClient->request('POST', $this->baseUrl, ['json' => $requestJson]);
 
-        $aiLog->setResponseJson($response->getContent()); //$response->getContent() stáhne content a provede request
-        $aiLog->setDuration((int) round(($response->getInfo('total_time') ?? 0) * 1000));
+        $responseJson = $response->getContent();
+        $totalTime = $response->getInfo('total_time');
+        $duration = (int) round((is_float($totalTime) ? $totalTime : 0.0) * 1000);
 
+        /** @var array<string, mixed> $data */
         $data = $response->toArray();
 
-        $content = $data['choices'][0]['message']['content'];
+        /** @var array<int, array<string, array<string, string>>> $choices */
+        $choices = $data['choices'];
+        $content = $choices[0]['message']['content'];
         $content = trim($content);
 
         if (str_starts_with($content, 'json')) {
-            $content = substr($content, strpos($content, '{'));
+            $bracePosition = strpos($content, '{');
+            if ($bracePosition !== false) {
+                $content = substr($content, $bracePosition);
+            }
         }
 
-        if (preg_match('/\{.*\}/s', $content, $matches)) {
+        if (preg_match('/\{.*\}/s', $content, $matches) === 1) {
             $json = $matches[0];
             $decoded = json_decode($json, true);
 
-            $aiLog->setReturnContent($json);
-            $this->em->persist($aiLog);
-            $this->em->flush();
+            $aiLog->recordResponse($responseJson, $duration, $json);
+            $this->entityManager->persist($aiLog);
+            $this->entityManager->flush();
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new RuntimeException('JSON parsing failed: ' . json_last_error_msg());
+                throw new RuntimeException(sprintf('JSON parsing failed: %s', json_last_error_msg()));
             }
 
+            /** @var array<string, mixed> $decoded */
             return $decoded;
         }
 
-        $aiLog->setReturnContent($content ?? '');
-        $this->em->persist($aiLog);
-        $this->em->flush();
+        $aiLog->recordResponse($responseJson, $duration, $content);
+        $this->entityManager->persist($aiLog);
+        $this->entityManager->flush();
 
-        return $content ?? '';
+        return $content;
+    }
+
+    private function createAiLog(
+        string $actionName,
+        string $userPrompt,
+        string $systemPrompt,
+        string $requestJson,
+        DateTimeImmutable $createdAt,
+    ): AiLog {
+        $log = new AiLog(
+            $this->aiModelName,
+            $createdAt,
+            $this->baseUrl,
+            $actionName,
+            $userPrompt,
+            $systemPrompt,
+            $requestJson,
+        );
+        $this->entityManager->persist($log);
+        $this->entityManager->flush();
+
+        return $log;
     }
 }
