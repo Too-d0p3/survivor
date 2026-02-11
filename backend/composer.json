@@ -79,7 +79,9 @@
             "@auto-scripts"
         ],
         "cs:check": "phpcs",
-        "cs:fix": "phpcbf"
+        "cs:fix": "phpcbf",
+        "stan": "phpstan analyse --memory-limit=512M",
+        "stan:baseline": "phpstan analyse --generate-baseline --memory-limit=512M"
     },
     "conflict": {
         "symfony/symfony": "*"
@@ -91,6 +93,10 @@
         }
     },
     "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-doctrine": "^2.0",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "phpstan/phpstan-symfony": "^2.0",
         "slevomat/coding-standard": "^8.27",
         "squizlabs/php_codesniffer": "^4.0"
     }

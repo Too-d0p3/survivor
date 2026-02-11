@@ -1,0 +1,16 @@
+includes:
+    - phpstan-baseline.neon
+    - vendor/phpstan/phpstan-doctrine/extension.neon
+    - vendor/phpstan/phpstan-doctrine/rules.neon
+    - vendor/phpstan/phpstan-symfony/extension.neon
+    - vendor/phpstan/phpstan-symfony/rules.neon
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+
+parameters:
+    phpVersion: 80500
+    level: max
+    paths:
+        - src/
+    reportUnmatchedIgnoredErrors: true
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml

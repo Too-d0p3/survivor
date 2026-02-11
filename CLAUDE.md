@@ -83,6 +83,12 @@ docker-compose exec php composer cs:check
 ```
 If there are auto-fixable violations, run `docker-compose exec php composer cs:fix` first, then verify. Never commit code that fails PHPCS.
 
+**PHPStan is mandatory.** Every commit must pass `composer stan` with zero errors. After any PHP file change, always verify by running:
+```bash
+docker-compose exec php composer stan
+```
+PHPStan runs at level max with strict rules. Existing violations are captured in `phpstan-baseline.neon` — new code must not introduce new errors. To regenerate the baseline (e.g. after fixing baselined errors), run `docker-compose exec php composer stan:baseline`.
+
 ## Key Entities and Relationships
 
 - **User** → owns many **Games**

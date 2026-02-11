@@ -1,0 +1,475 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\.$#'
+			identifier: foreach.nonIterable
+			count: 1
+			path: src/Cli/User/CreateSampleDataCommand.php
+
+		-
+			message: '#^Only booleans are allowed in a negated boolean, Symfony\\Component\\Console\\Application\|null given\.$#'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: src/Cli/User/CreateSampleDataCommand.php
+
+		-
+			message: '#^Only booleans are allowed in an if condition, mixed given\.$#'
+			identifier: if.condNotBoolean
+			count: 1
+			path: src/Cli/User/CreateSampleDataCommand.php
+
+		-
+			message: '#^Parameter \#1 \$params of static method Doctrine\\DBAL\\DriverManager\:\:getConnection\(\) expects array\{application_name\?\: string, charset\?\: string, dbname\?\: string, defaultTableOptions\?\: array\<string, mixed\>, driver\?\: ''ibm_db2''\|''mysqli''\|''oci8''\|''pdo_mysql''\|''pdo_oci''\|''pdo_pgsql''\|''pdo_sqlite''\|''pdo_sqlsrv''\|''pgsql''\|''sqlite3''\|''sqlsrv'', driverClass\?\: class\-string\<Doctrine\\DBAL\\Driver\>, driverOptions\?\: array\<mixed\>, host\?\: string, \.\.\.\}, non\-empty\-array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Cli/User/CreateSampleDataCommand.php
+
+		-
+			message: '#^Parameter \#1 \$str of method Doctrine\\DBAL\\Platforms\\AbstractPlatform\:\:quoteSingleIdentifier\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Cli/User/CreateSampleDataCommand.php
+
+		-
+			message: '#^Parameter \#2 \.\.\.\$values of function sprintf expects bool\|float\|int\|string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 4
+			path: src/Cli/User/CreateSampleDataCommand.php
+
+		-
+			message: '#^Possibly invalid array key type mixed\.$#'
+			identifier: offsetAccess.invalidOffset
+			count: 2
+			path: src/Cli/User/CreateSampleDataCommand.php
+
+		-
+			message: '#^Binary operation "\*" between mixed and 1000 results in an error\.$#'
+			identifier: binaryOp.invalid
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Cannot access offset ''content'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Cannot access offset ''message'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Cannot access offset 0 on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Method App\\Domain\\Ai\\AiClient\:\:ask\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Method App\\Domain\\Ai\\AiClient\:\:ask\(\) should return array\|string but returns mixed\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Only booleans are allowed in an if condition, int\|false given\.$#'
+			identifier: if.condNotBoolean
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Parameter \#1 \$string of function trim expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Parameter \#2 \$offset of function substr expects int, int\<0, max\>\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Parameter \#4 \$requestJson of method App\\Domain\\Ai\\AiClient\:\:createAiLog\(\) expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Variable \$content on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 2
+			path: src/Domain/Ai/AiClient.php
+
+		-
+			message: '#^Cannot call method getKey\(\) on App\\Domain\\TraitDef\\TraitDef\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: src/Domain/Ai/AiPlayerService.php
+
+		-
+			message: '#^Method App\\Domain\\Ai\\AiPlayerService\:\:generatePlayerTraitsFromDescription\(\) should return array\<string, mixed\> but returns array\|string\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domain/Ai/AiPlayerService.php
+
+		-
+			message: '#^Method App\\Domain\\Ai\\AiPlayerService\:\:generatePlayerTraitsSummaryDescription\(\) should return array\<string, mixed\> but returns array\|string\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domain/Ai/AiPlayerService.php
+
+		-
+			message: '#^PHPDoc tag @var has invalid value \(\$trait PlayerTrait\)\: Unexpected token "\$trait", expected type at offset 9 on line 1$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: src/Domain/Ai/AiPlayerService.php
+
+		-
+			message: '#^Property App\\Domain\\Ai\\Log\\AiLog\:\:\$createdAt type mapping mismatch\: property can contain DateTimeImmutable\|null but database expects DateTimeImmutable\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/Ai/Log/AiLog.php
+
+		-
+			message: '#^Property App\\Domain\\Ai\\Log\\AiLog\:\:\$modelName type mapping mismatch\: property can contain string\|null but database expects string\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/Ai/Log/AiLog.php
+
+		-
+			message: '#^Class App\\Domain\\Ai\\Log\\AiLogRepository has PHPDoc tag @method for method findBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Ai/Log/AiLogRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Ai\\Log\\AiLogRepository has PHPDoc tag @method for method findBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Ai/Log/AiLogRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Ai\\Log\\AiLogRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Ai/Log/AiLogRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Ai\\Log\\AiLogRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Ai/Log/AiLogRepository.php
+
+		-
+			message: '#^Property App\\Domain\\Game\\Game\:\:\$createdAt type mapping mismatch\: property can contain DateTimeInterface\|null but database expects DateTimeInterface\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/Game/Game.php
+
+		-
+			message: '#^Property App\\Domain\\Game\\Game\:\:\$isSandbox type mapping mismatch\: property can contain bool\|null but database expects bool\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/Game/Game.php
+
+		-
+			message: '#^Property App\\Domain\\Game\\Game\:\:\$owner type mapping mismatch\: property can contain App\\Domain\\User\\User\|null but database expects App\\Domain\\User\\User\.$#'
+			identifier: doctrine.associationType
+			count: 1
+			path: src/Domain/Game/Game.php
+
+		-
+			message: '#^Property App\\Domain\\Game\\Game\:\:\$players type mapping mismatch\: property can contain Doctrine\\Common\\Collections\\Collection but database expects Doctrine\\Common\\Collections\\Collection&iterable\<App\\Domain\\Player\\Player\>\.$#'
+			identifier: doctrine.associationType
+			count: 1
+			path: src/Domain/Game/Game.php
+
+		-
+			message: '#^Property App\\Domain\\Game\\Game\:\:\$players with generic interface Doctrine\\Common\\Collections\\Collection does not specify its types\: TKey, T$#'
+			identifier: missingType.generics
+			count: 1
+			path: src/Domain/Game/Game.php
+
+		-
+			message: '#^Only booleans are allowed in a negated boolean, App\\Domain\\User\\User\|null given\.$#'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: src/Domain/Game/GameController.php
+
+		-
+			message: '#^Class App\\Domain\\Game\\GameRepository has PHPDoc tag @method for method findBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Game/GameRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Game\\GameRepository has PHPDoc tag @method for method findBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Game/GameRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Game\\GameRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Game/GameRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Game\\GameRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Game/GameRepository.php
+
+		-
+			message: '#^Property App\\Domain\\Player\\Player\:\:\$game type mapping mismatch\: property can contain App\\Domain\\Game\\Game\|null but database expects App\\Domain\\Game\\Game\.$#'
+			identifier: doctrine.associationType
+			count: 1
+			path: src/Domain/Player/Player.php
+
+		-
+			message: '#^Property App\\Domain\\Player\\Player\:\:\$isUserControlled type mapping mismatch\: property can contain bool\|null but database expects bool\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/Player/Player.php
+
+		-
+			message: '#^Property App\\Domain\\Player\\Player\:\:\$name type mapping mismatch\: property can contain string\|null but database expects string\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/Player/Player.php
+
+		-
+			message: '#^Property App\\Domain\\Player\\Player\:\:\$playerTraits type mapping mismatch\: property can contain Doctrine\\Common\\Collections\\Collection but database expects Doctrine\\Common\\Collections\\Collection&iterable\<App\\Domain\\Player\\Trait\\PlayerTrait\>\.$#'
+			identifier: doctrine.associationType
+			count: 1
+			path: src/Domain/Player/Player.php
+
+		-
+			message: '#^Property App\\Domain\\Player\\Player\:\:\$playerTraits with generic interface Doctrine\\Common\\Collections\\Collection does not specify its types\: TKey, T$#'
+			identifier: missingType.generics
+			count: 1
+			path: src/Domain/Player/Player.php
+
+		-
+			message: '#^Cannot access offset string on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: src/Domain/Player/PlayerController.php
+
+		-
+			message: '#^Cannot access property \$description on object\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: src/Domain/Player/PlayerController.php
+
+		-
+			message: '#^Only booleans are allowed in a negated boolean, App\\Domain\\User\\User\|null given\.$#'
+			identifier: booleanNot.exprNotBoolean
+			count: 2
+			path: src/Domain/Player/PlayerController.php
+
+		-
+			message: '#^Only booleans are allowed in an if condition, array\<string\> given\.$#'
+			identifier: if.condNotBoolean
+			count: 1
+			path: src/Domain/Player/PlayerController.php
+
+		-
+			message: '#^Parameter \#1 \$description of method App\\Domain\\Player\\PlayerService\:\:generatePlayerTraitsFromDescription\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/Player/PlayerController.php
+
+		-
+			message: '#^Parameter \#1 \$strength of method App\\Domain\\Player\\Trait\\PlayerTrait\:\:setStrength\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/Player/PlayerController.php
+
+		-
+			message: '#^Class App\\Domain\\Player\\PlayerRepository has PHPDoc tag @method for method findBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Player/PlayerRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Player\\PlayerRepository has PHPDoc tag @method for method findBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Player/PlayerRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Player\\PlayerRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Player/PlayerRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Player\\PlayerRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Player/PlayerRepository.php
+
+		-
+			message: '#^Parameter \#2 \$traits of method App\\Domain\\Ai\\AiPlayerService\:\:generatePlayerTraitsFromDescription\(\) expects array\<int, App\\Domain\\TraitDef\\TraitDef\>, array\<App\\Domain\\TraitDef\\TraitDef\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/Player/PlayerService.php
+
+		-
+			message: '#^Property App\\Domain\\Player\\PlayerService\:\:\$em is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Domain/Player/PlayerService.php
+
+		-
+			message: '#^Property App\\Domain\\Player\\Trait\\PlayerTrait\:\:\$player type mapping mismatch\: property can contain App\\Domain\\Player\\Player\|null but database expects App\\Domain\\Player\\Player\.$#'
+			identifier: doctrine.associationType
+			count: 1
+			path: src/Domain/Player/Trait/PlayerTrait.php
+
+		-
+			message: '#^Property App\\Domain\\Player\\Trait\\PlayerTrait\:\:\$strength type mapping mismatch\: property can contain string\|null but database expects float\|int\|string\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/Player/Trait/PlayerTrait.php
+
+		-
+			message: '#^Property App\\Domain\\Player\\Trait\\PlayerTrait\:\:\$traitDef type mapping mismatch\: property can contain App\\Domain\\TraitDef\\TraitDef\|null but database expects App\\Domain\\TraitDef\\TraitDef\.$#'
+			identifier: doctrine.associationType
+			count: 1
+			path: src/Domain/Player/Trait/PlayerTrait.php
+
+		-
+			message: '#^Class App\\Domain\\Player\\Trait\\PlayerTraitRepository has PHPDoc tag @method for method findBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Player/Trait/PlayerTraitRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Player\\Trait\\PlayerTraitRepository has PHPDoc tag @method for method findBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Player/Trait/PlayerTraitRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Player\\Trait\\PlayerTraitRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Player/Trait/PlayerTraitRepository.php
+
+		-
+			message: '#^Class App\\Domain\\Player\\Trait\\PlayerTraitRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/Player/Trait/PlayerTraitRepository.php
+
+		-
+			message: '#^Call to sprintf contains 1 placeholder, 2 values given\.$#'
+			identifier: argument.sprintf
+			count: 1
+			path: src/Domain/TraitDef/Exceptions/CannotCreateTraitDefBecauseTraitDefWithSameKeyAlreadyExistsException.php
+
+		-
+			message: '#^Call to function in_array\(\) requires parameter \#3 to be set\.$#'
+			identifier: function.strict
+			count: 1
+			path: src/Domain/TraitDef/TraitDef.php
+
+		-
+			message: '#^Property App\\Domain\\TraitDef\\TraitDef\:\:\$description type mapping mismatch\: database can contain string\|null but property expects string\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/TraitDef/TraitDef.php
+
+		-
+			message: '#^Class App\\Domain\\TraitDef\\TraitDefRepository has PHPDoc tag @method for method findBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/TraitDef/TraitDefRepository.php
+
+		-
+			message: '#^Class App\\Domain\\TraitDef\\TraitDefRepository has PHPDoc tag @method for method findBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/TraitDef/TraitDefRepository.php
+
+		-
+			message: '#^Class App\\Domain\\TraitDef\\TraitDefRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#1 \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/TraitDef/TraitDefRepository.php
+
+		-
+			message: '#^Class App\\Domain\\TraitDef\\TraitDefRepository has PHPDoc tag @method for method findOneBy\(\) parameter \#2 \$orderBy with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Domain/TraitDef/TraitDefRepository.php
+
+		-
+			message: '#^Method App\\Domain\\User\\User\:\:getPassword\(\) should return string but returns string\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domain/User/User.php
+
+		-
+			message: '#^Method App\\Domain\\User\\User\:\:getUserIdentifier\(\) should return non\-empty\-string but returns string\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domain/User/User.php
+
+		-
+			message: '#^Property App\\Domain\\User\\User\:\:\$email type mapping mismatch\: property can contain string\|null but database expects string\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/User/User.php
+
+		-
+			message: '#^Property App\\Domain\\User\\User\:\:\$games type mapping mismatch\: property can contain Doctrine\\Common\\Collections\\Collection but database expects Doctrine\\Common\\Collections\\Collection&iterable\<App\\Domain\\Game\\Game\>\.$#'
+			identifier: doctrine.associationType
+			count: 1
+			path: src/Domain/User/User.php
+
+		-
+			message: '#^Property App\\Domain\\User\\User\:\:\$games with generic interface Doctrine\\Common\\Collections\\Collection does not specify its types\: TKey, T$#'
+			identifier: missingType.generics
+			count: 1
+			path: src/Domain/User/User.php
+
+		-
+			message: '#^Property App\\Domain\\User\\User\:\:\$password type mapping mismatch\: property can contain string\|null but database expects string\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Domain/User/User.php
+
+		-
+			message: '#^Only booleans are allowed in a negated boolean, App\\Domain\\User\\User\|null given\.$#'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: src/Domain/User/UserController.php
+
+		-
+			message: '#^Only booleans are allowed in an if condition, App\\Domain\\User\\User\|null given\.$#'
+			identifier: if.condNotBoolean
+			count: 1
+			path: src/Domain/User/UserFacade.php
+
+		-
+			message: '#^Method App\\Shared\\Controller\\AbstractApiController\:\:getValidatedDto\(\) should return array\{object\|null, array\<string\>\} but returns array\{mixed, array\{\}\}\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Shared/Controller/AbstractApiController.php
+
+		-
+			message: '#^Parameter \#2 \$value of method Symfony\\Component\\DependencyInjection\\Container\:\:setParameter\(\) expects array\|bool\|float\|int\|string\|UnitEnum\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Shared/SampleData/AppSampleDataExtension.php
