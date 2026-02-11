@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Ai\Log;
 
 use DateTimeImmutable;
@@ -166,4 +168,4 @@ class AiLog
 
         return $this;
     }
-} 
+}

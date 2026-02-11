@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\User;
 
 use App\Domain\Game\Game;
@@ -24,6 +26,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private ?string $email = null;
 
+    /** @var array<string> */
     #[ORM\Column]
     #[Groups(['user:read'])]
     private array $roles = [];
@@ -36,8 +39,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function __construct(
         string $email,
-    )
-    {
+    ) {
         $this->email = $email;
         $this->games = new ArrayCollection();
     }
@@ -57,6 +59,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->email;
     }
 
+    /**
+     * @return array<string>
+     */
     public function getRoles(): array
     {
         $roles = $this->roles;

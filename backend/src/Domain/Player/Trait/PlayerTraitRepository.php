@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Player\Trait;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -19,4 +21,4 @@ class PlayerTraitRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, PlayerTrait::class);
     }
-} 
+}

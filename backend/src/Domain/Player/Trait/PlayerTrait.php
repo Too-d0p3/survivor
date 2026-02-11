@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Player\Trait;
 
 use App\Domain\Player\Player;
@@ -71,4 +73,4 @@ class PlayerTrait
         $this->strength = $strength;
         return $this;
     }
-} 
+}

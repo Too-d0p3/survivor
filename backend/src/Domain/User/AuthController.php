@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\User;
 
 use App\Domain\User\Exceptions\CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException;
@@ -14,11 +16,11 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[AsController]
 class AuthController
 {
+    private UserFacade $userFacade;
 
-    public function __construct(
-        private UserFacade $userFacade
-    )
+    public function __construct(UserFacade $userFacade)
     {
+        $this->userFacade = $userFacade;
     }
 
     #[Route('/api/register', name: 'api_register', methods: ['POST'])]

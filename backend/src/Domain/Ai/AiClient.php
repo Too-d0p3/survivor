@@ -1,24 +1,42 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Ai;
 
 use App\Domain\Ai\Log\AiLog;
 use Doctrine\ORM\EntityManagerInterface;
+use RuntimeException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class AiClient
 {
+    private HttpClientInterface $httpClient;
+
+    private EntityManagerInterface $em;
+
+    private string $baseUrl;
+
+    private string $aiModelName;
+
     public function __construct(
-        private HttpClientInterface $httpClient,
-        private EntityManagerInterface $em,
-        private string              $baseUrl = 'http://192.168.1.2:1234/v1/chat/completions', // nebo uprav podle LM studia
-        private string $aiModelName = 'local', //TMP
-    )
-    {
+        HttpClientInterface $httpClient,
+        EntityManagerInterface $em,
+        string $baseUrl = 'http://192.168.1.2:1234/v1/chat/completions',
+        string $aiModelName = 'local',
+    ) {
+        $this->httpClient = $httpClient;
+        $this->em = $em;
+        $this->baseUrl = $baseUrl;
+        $this->aiModelName = $aiModelName;
     }
 
-    public function createAiLog(string $actionName, string $userPrompt, string $systemPrompt, string $requestJson): AiLog
-    {
+    public function createAiLog(
+        string $actionName,
+        string $userPrompt,
+        string $systemPrompt,
+        string $requestJson,
+    ): AiLog {
         $log = new AiLog();
         $log->setModelName($this->aiModelName); //tmp
         $log->setApiUrl($this->baseUrl);
@@ -32,14 +50,21 @@ class AiClient
         return $log;
     }
 
-    public function ask(string $actionName, string $systemPrompt, array $messages, float $temperature = 0.6): string|array
-    {
+    /**
+     * @param array<int, array<string, string>> $messages
+     */
+    public function ask(
+        string $actionName,
+        string $systemPrompt,
+        array $messages,
+        float $temperature = 0.6,
+    ): string|array {
         $requestJson = [
             'model' => 'local-model', // LM Studio model name (pokud je potřeba)
             'temperature' => $temperature,
             'messages' => array_merge(
                 [['role' => 'system', 'content' => $systemPrompt]],
-                $messages
+                $messages,
             )
         ];
 
@@ -55,7 +80,7 @@ class AiClient
         $content = $data['choices'][0]['message']['content'];
         $content = trim($content);
 
-        if(str_starts_with($content, 'json')){
+        if (str_starts_with($content, 'json')) {
             $content = substr($content, strpos($content, '{'));
         }
 
@@ -68,7 +93,7 @@ class AiClient
             $this->em->flush();
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \RuntimeException('JSON parsing failed: ' . json_last_error_msg());
+                throw new RuntimeException('JSON parsing failed: ' . json_last_error_msg());
             }
 
             return $decoded;

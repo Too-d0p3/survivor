@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Player;
 
 use App\Domain\Player\Trait\PlayerTrait;
@@ -16,14 +18,19 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class PlayerController extends AbstractApiController
 {
-    public function __construct(private PlayerService $playerService) {}
+    private PlayerService $playerService;
+
+    public function __construct(PlayerService $playerService)
+    {
+        $this->playerService = $playerService;
+    }
 
     #[Route('/api/game/player/traits/generate', name: 'game_player_traits_generate', methods: ['POST'])]
     public function generateTraits(
         #[CurrentUser] ?User $user,
         Request $request,
         SerializerInterface $serializer,
-        ValidatorInterface $validator
+        ValidatorInterface $validator,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['message' => 'Not authenticated'], 401);
@@ -40,7 +47,11 @@ class PlayerController extends AbstractApiController
         return $this->json($result);
     }
 
-    #[Route('/api/game/player/traits/generate-summary-description', name: 'game_player_traits_generate_summary_description', methods: ['POST'])]
+    #[Route(
+        '/api/game/player/traits/generate-summary-description',
+        name: 'game_player_traits_generate_summary_description',
+        methods: ['POST'],
+    )]
     public function generateSummaryDescription(
         #[CurrentUser] ?User $user,
         Request $request,

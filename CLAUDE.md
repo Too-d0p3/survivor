@@ -77,6 +77,12 @@ Shared utilities live in `backend/src/Shared/` (base controller, sample data sys
 
 See [CODING_STANDARDS.md](CODING_STANDARDS.md) for the full backend coding standards.
 
+**PHPCS is mandatory.** Every commit must pass `composer cs:check` with zero errors. After any PHP file change, always verify by running:
+```bash
+docker-compose exec php composer cs:check
+```
+If there are auto-fixable violations, run `docker-compose exec php composer cs:fix` first, then verify. Never commit code that fails PHPCS.
+
 ## Key Entities and Relationships
 
 - **User** → owns many **Games**

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\User\Exceptions;
 
 use RuntimeException;
@@ -7,17 +9,23 @@ use Throwable;
 
 class CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException extends RuntimeException
 {
+    private string $email;
 
     public function __construct(
-        private string $email,
-        ?Throwable $previous = null
+        string $email,
+        ?Throwable $previous = null,
     ) {
-        parent::__construct(sprintf('Cannot register user because user with email `%s` already exists', $email), $previous);
+        $this->email = $email;
+
+        parent::__construct(
+            sprintf('Cannot register user because user with email `%s` already exists', $email),
+            0,
+            $previous,
+        );
     }
 
     public function getEmail(): string
     {
         return $this->email;
     }
-
 }

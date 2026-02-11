@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Shared\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -9,11 +11,14 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 abstract class AbstractApiController extends AbstractController
 {
+    /**
+     * @return array{object|null, array<string>}
+     */
     public function getValidatedDto(
         Request $request,
         string $dtoClass,
         SerializerInterface $serializer,
-        ValidatorInterface $validator
+        ValidatorInterface $validator,
     ): array {
         $data = $request->getContent();
 

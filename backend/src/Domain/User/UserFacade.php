@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\User;
 
 use App\Domain\User\Exceptions\CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException;
@@ -8,20 +10,26 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class UserFacade
 {
+    private UserRepository $userRepository;
+
+    private UserPasswordHasherInterface $passwordHasher;
+
+    private EntityManagerInterface $entityManager;
 
     public function __construct(
-        private UserRepository $userRepository,
-        private UserPasswordHasherInterface $passwordHasher,
-        private EntityManagerInterface $entityManager,
+        UserRepository $userRepository,
+        UserPasswordHasherInterface $passwordHasher,
+        EntityManagerInterface $entityManager,
     ) {
-
+        $this->userRepository = $userRepository;
+        $this->passwordHasher = $passwordHasher;
+        $this->entityManager = $entityManager;
     }
 
     public function registerUser(
         string $email,
         string $password,
-    ): User
-    {
+    ): User {
         if ($this->userRepository->findOneBy(['email' => $email])) {
             throw new CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException($email);
         }
@@ -35,5 +43,4 @@ class UserFacade
 
         return $user;
     }
-
 }

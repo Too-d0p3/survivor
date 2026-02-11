@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cli\User;
 
 use App\Shared\SampleData\SampleData;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Exception;
+use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -15,27 +18,35 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
-use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 #[AsCommand(
     name: 'app:sample-data:create',
-    description: 'Create sample data in configured order'
+    description: 'Create sample data in configured order',
 )]
 class CreateSampleDataCommand extends Command
 {
+    /** @var iterable<SampleData> */
+    private readonly iterable $sampleDataCreators;
+
+    /** @var array<string, mixed> */
+    private readonly array $sampleDataConfig;
+
+    private readonly Connection $connection;
 
     /**
      * @param iterable<SampleData> $sampleDataCreators
+     * @param array<string, mixed> $sampleDataConfig
      */
     public function __construct(
         #[AutowireIterator('app.shared.sample_data')]
-        private readonly iterable $sampleDataCreators,
-
+        iterable $sampleDataCreators,
         #[Autowire('%app_sample_data%')]
-        private readonly array $sampleDataConfig,
-
-        private readonly Connection $connection,
+        array $sampleDataConfig,
+        Connection $connection,
     ) {
+        $this->sampleDataCreators = $sampleDataCreators;
+        $this->sampleDataConfig = $sampleDataConfig;
+        $this->connection = $connection;
         parent::__construct();
     }
 
@@ -46,7 +57,7 @@ class CreateSampleDataCommand extends Command
                 'reset-db',
                 null,
                 InputOption::VALUE_NONE,
-                'Drops and recreates the database before creating sample data'
+                'Drops and recreates the database before creating sample data',
             );
     }
 
@@ -68,9 +79,9 @@ class CreateSampleDataCommand extends Command
 
         foreach ($order as $class) {
             if (!isset($map[$class])) {
-                throw new \RuntimeException(sprintf(
+                throw new RuntimeException(sprintf(
                     'SampleData class `%s` is not registered or does not implement SampleData interface.',
-                    $class
+                    $class,
                 ));
             }
 
@@ -87,7 +98,7 @@ class CreateSampleDataCommand extends Command
     private function resetDatabasePostgres(SymfonyStyle $io): void
     {
         if (($_ENV['APP_ENV'] ?? 'dev') === 'prod') {
-            throw new \RuntimeException('Database reset is not allowed in production.');
+            throw new RuntimeException('Database reset is not allowed in production.');
         }
 
 
@@ -96,14 +107,16 @@ class CreateSampleDataCommand extends Command
 
 
         if (!$dbName) {
-            throw new \RuntimeException('Database name not found in connection params.');
+            throw new RuntimeException('Database name not found in connection params.');
         }
 
 
-        if (!$io->confirm(
-            sprintf('⚠ This will DROP and recreate database "%s". Continue?', $dbName),
-            false
-        )) {
+        if (
+            !$io->confirm(
+                sprintf('⚠ This will DROP and recreate database "%s". Continue?', $dbName),
+                false,
+            )
+        ) {
             $io->warning('Database reset aborted.');
             return;
         }
@@ -125,7 +138,7 @@ class CreateSampleDataCommand extends Command
 FROM pg_stat_activity
 WHERE datname = :db
 AND pid <> pg_backend_pid()",
-            ['db' => $dbName]
+            ['db' => $dbName],
         );
 
 
@@ -138,7 +151,7 @@ AND pid <> pg_backend_pid()",
             $adminConn->executeStatement("DROP DATABASE IF EXISTS {$quotedDb}");
             $adminConn->executeStatement("CREATE DATABASE {$quotedDb}");
         } catch (Exception $e) {
-            throw new \RuntimeException('Failed to reset database: '.$e->getMessage(), 0, $e);
+            throw new RuntimeException('Failed to reset database: ' . $e->getMessage(), 0, $e);
         } finally {
             $adminConn->close();
         }
@@ -151,7 +164,7 @@ AND pid <> pg_backend_pid()",
     {
         $application = $this->getApplication();
         if (!$application) {
-            throw new \RuntimeException('Console application not available.');
+            throw new RuntimeException('Console application not available.');
         }
 
 
@@ -166,5 +179,4 @@ AND pid <> pg_backend_pid()",
 // nech to psát do stejného outputu, ať vidíš co dělá
         $command->run($input, $output);
     }
-
 }

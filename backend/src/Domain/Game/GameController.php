@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Game;
 
 use App\Domain\User\User;
@@ -14,7 +16,7 @@ class GameController extends AbstractController
     #[Route('/api/game/create', name: 'game_create', methods: ['POST'])]
     public function createGame(GameService $gameService, Security $security, #[CurrentUser] ?User $user): JsonResponse
     {
-        if(!$user){
+        if (!$user) {
             return $this->json(['message' => 'Not authenticated'], 401);
         }
 

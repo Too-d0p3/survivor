@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\TraitDef;
 
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use InvalidArgumentException;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: TraitDefRepository::class)]
@@ -49,8 +52,7 @@ class TraitDef
         string $label,
         string $description,
         string $type,
-    )
-    {
+    ) {
         $this->key = $key;
         $this->label = $label;
         $this->description = $description;
@@ -85,10 +87,9 @@ class TraitDef
     private function setType(string $type): static
     {
         if (!in_array($type, self::ALLOWED_TYPES)) {
-            throw new \InvalidArgumentException("Invalid trait type");
+            throw new InvalidArgumentException("Invalid trait type");
         }
         $this->type = $type;
         return $this;
     }
-
-} 
+}

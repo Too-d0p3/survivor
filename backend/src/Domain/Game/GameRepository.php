@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Game;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -21,4 +23,4 @@ class GameRepository extends ServiceEntityRepository
     }
 
     // Můžeš přidat vlastní metody repozitáře...
-} 
+}

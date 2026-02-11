@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Ai\Log;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -44,4 +46,4 @@ class AiLogRepository extends ServiceEntityRepository
 //            ->getOneOrNullResult()
 //        ;
 //    }
-} 
+}

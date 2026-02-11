@@ -1,15 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\TraitDef;
 
 use App\Shared\SampleData\SampleData;
 
 class TraitDefSampleData implements SampleData
 {
+    private TraitDefFacade $traitDefFacade;
 
-    public function __construct(
-        private TraitDefFacade $traitDefFacade,
-    ){
+    public function __construct(TraitDefFacade $traitDefFacade)
+    {
+        $this->traitDefFacade = $traitDefFacade;
     }
 
     public function create(): void
@@ -59,7 +62,8 @@ class TraitDefSampleData implements SampleData
         $this->traitDefFacade->createTraitDef(
             'strategic',
             'Strategický',
-            'Přemýšlí dopředu a skládá si plán do několika kroků. Upřednostňuje dlouhodobý zisk před okamžitým impulzem.',
+            'Přemýšlí dopředu a skládá si plán do několika kroků.'
+            . ' Upřednostňuje dlouhodobý zisk před okamžitým impulzem.',
             TraitDef::TYPE_STRATEGIC,
         );
 
@@ -84,5 +88,4 @@ class TraitDefSampleData implements SampleData
             TraitDef::TYPE_SOCIAL,
         );
     }
-
 }

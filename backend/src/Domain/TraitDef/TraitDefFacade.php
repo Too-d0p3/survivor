@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\TraitDef;
 
 use App\Domain\TraitDef\Exceptions\CannotCreateTraitDefBecauseTraitDefWithSameKeyAlreadyExistsException;
@@ -7,12 +9,16 @@ use Doctrine\ORM\EntityManagerInterface;
 
 class TraitDefFacade
 {
+    private TraitDefRepository $traitDefRepository;
+
+    private EntityManagerInterface $entityManager;
 
     public function __construct(
-        private TraitDefRepository $traitDefRepository,
-        private EntityManagerInterface $entityManager,
-    )
-    {
+        TraitDefRepository $traitDefRepository,
+        EntityManagerInterface $entityManager,
+    ) {
+        $this->traitDefRepository = $traitDefRepository;
+        $this->entityManager = $entityManager;
     }
 
 
@@ -21,8 +27,7 @@ class TraitDefFacade
         string $label,
         string $description,
         string $type,
-    ): TraitDef
-    {
+    ): TraitDef {
         $existingTraitDef = $this->traitDefRepository->findOneBy(['key' => $key]);
 
         if ($existingTraitDef !== null) {
@@ -41,5 +46,4 @@ class TraitDefFacade
 
         return $traitDef;
     }
-
 }

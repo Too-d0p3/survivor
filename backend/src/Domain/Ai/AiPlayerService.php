@@ -1,16 +1,27 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Ai;
 
+use App\Domain\Ai\AiClient;
 use App\Domain\Player\Trait\PlayerTrait;
 use App\Domain\TraitDef\TraitDef;
-use App\Domain\Ai\AiClient;
 
 class AiPlayerService
 {
-    public function __construct(private AiClient $aiClient) {}
+    private AiClient $aiClient;
 
-    public function generatePlayerTraitsFromDescription($description, $traits): array
+    public function __construct(AiClient $aiClient)
+    {
+        $this->aiClient = $aiClient;
+    }
+
+    /**
+     * @param array<int, TraitDef> $traits
+     * @return array<string, mixed>
+     */
+    public function generatePlayerTraitsFromDescription(string $description, array $traits): array
     {
         $traitsString = '[' . implode(', ', array_map(fn($trait) => $trait->getKey(), $traits)) . ']';
 
@@ -49,6 +60,10 @@ PROMPT;
         return $response;
     }
 
+    /**
+     * @param array<int, PlayerTrait> $playerTraits
+     * @return array<string, mixed>
+     */
     public function generatePlayerTraitsSummaryDescription(array $playerTraits): array
     {
         $content = '';
