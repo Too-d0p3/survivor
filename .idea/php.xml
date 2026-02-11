@@ -10,6 +10,11 @@
     <option name="highlightLevel" value="WARNING" />
     <option name="transferred" value="true" />
   </component>
+  <component name="PhpCodeSniffer">
+    <phpcs_settings>
+      <PhpCSConfiguration beautifier_path="$PROJECT_DIR$/backend/vendor/bin/phpcbf" tool_path="$PROJECT_DIR$/backend/vendor/bin/phpcs" />
+    </phpcs_settings>
+  </component>
   <component name="PhpIncludePathManager">
     <include_path>
       <path value="$PROJECT_DIR$/backend/vendor/psr/container" />
@@ -104,6 +109,9 @@
       <path value="$PROJECT_DIR$/backend/vendor/guzzlehttp/psr7" />
       <path value="$PROJECT_DIR$/backend/vendor/guzzlehttp/guzzle" />
       <path value="$PROJECT_DIR$/backend/vendor/ralouphie/getallheaders" />
+      <path value="$PROJECT_DIR$/backend/vendor/squizlabs/php_codesniffer" />
+      <path value="$PROJECT_DIR$/backend/vendor/slevomat/coding-standard" />
+      <path value="$PROJECT_DIR$/backend/vendor/dealerdirect/phpcodesniffer-composer-installer" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.5">

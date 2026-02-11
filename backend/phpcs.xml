@@ -1,0 +1,123 @@
+<?xml version="1.0"?>
+<ruleset name="AiSurvivor">
+    <description>AI Survivor coding standard based on CODING_STANDARDS.md</description>
+
+    <!-- Scan paths -->
+    <file>src</file>
+
+    <!-- Show progress and use colors -->
+    <arg value="ps"/>
+    <arg name="colors"/>
+
+    <!-- Base: PSR-12 -->
+    <rule ref="PSR12"/>
+
+    <!-- ============================================================ -->
+    <!-- Rules from CODING_STANDARDS.md                               -->
+    <!-- ============================================================ -->
+
+    <!-- §1 File Structure: declare(strict_types=1) -->
+    <rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes">
+        <properties>
+            <property name="spacesCountAroundEqualsSign" value="0"/>
+            <property name="linesCountBeforeDeclare" value="1"/>
+            <property name="linesCountAfterDeclare" value="1"/>
+        </properties>
+    </rule>
+
+    <!-- §2.4 No Constructor Promotion -->
+    <rule ref="SlevomatCodingStandard.Classes.DisallowConstructorPropertyPromotion"/>
+
+    <!-- §2.3 Element Order Inside a Class -->
+    <rule ref="SlevomatCodingStandard.Classes.ClassStructure">
+        <properties>
+            <property name="groups" type="array">
+                <element value="uses"/>
+                <element value="enum cases"/>
+                <element value="constants"/>
+                <element value="properties"/>
+                <element value="constructor"/>
+                <element value="destructor"/>
+                <element value="static constructors"/>
+                <element value="public methods, public final methods, public static methods, public static final methods"/>
+                <element value="public abstract methods, public static abstract methods"/>
+                <element value="protected methods, protected final methods, protected static methods, protected static final methods"/>
+                <element value="protected abstract methods, protected static abstract methods"/>
+                <element value="private methods, private static methods"/>
+                <element value="magic methods"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- §3.1 Native Types Everywhere -->
+    <rule ref="SlevomatCodingStandard.TypeHints.ParameterTypeHint"/>
+    <rule ref="SlevomatCodingStandard.TypeHints.PropertyTypeHint"/>
+    <rule ref="SlevomatCodingStandard.TypeHints.ReturnTypeHint"/>
+
+    <!-- §3.2 No useless docblock type hints -->
+    <rule ref="SlevomatCodingStandard.TypeHints.UselessConstantTypeHint"/>
+
+    <!-- §13.2 Early exit / no else after return -->
+    <rule ref="SlevomatCodingStandard.ControlStructures.EarlyExit"/>
+
+    <!-- §19 Code hygiene: unused imports -->
+    <rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
+        <properties>
+            <property name="searchAnnotations" value="true"/>
+        </properties>
+    </rule>
+
+    <!-- §9.2 No "Interface" suffix on interfaces -->
+    <rule ref="SlevomatCodingStandard.Classes.SuperfluousInterfaceNaming"/>
+
+    <!-- §19 Code hygiene: unused variables -->
+    <rule ref="SlevomatCodingStandard.Variables.UnusedVariable">
+        <properties>
+            <property name="ignoreUnusedValuesWhenOnlyKeysAreUsedInForeach" value="true"/>
+        </properties>
+    </rule>
+
+    <!-- General: use ::class instead of strings -->
+    <rule ref="SlevomatCodingStandard.Classes.ModernClassNameReference"/>
+
+    <!-- ============================================================ -->
+    <!-- Additional quality rules                                     -->
+    <!-- ============================================================ -->
+
+    <!-- Consistent import ordering -->
+    <rule ref="SlevomatCodingStandard.Namespaces.AlphabeticallySortedUses"/>
+
+    <!-- Use imports, not FQN -->
+    <rule ref="SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly">
+        <properties>
+            <property name="allowFullyQualifiedGlobalClasses" value="false"/>
+            <property name="allowFullyQualifiedGlobalFunctions" value="false"/>
+            <property name="allowFullyQualifiedGlobalConstants" value="false"/>
+            <property name="allowFullyQualifiedExceptions" value="false"/>
+            <property name="allowFullyQualifiedNameForCollidingClasses" value="true"/>
+            <property name="allowFullyQualifiedNameForCollidingFunctions" value="true"/>
+            <property name="allowFullyQualifiedNameForCollidingConstants" value="true"/>
+            <property name="searchAnnotations" value="true"/>
+        </properties>
+    </rule>
+
+    <!-- §2.3 No blank lines at class start/end -->
+    <rule ref="SlevomatCodingStandard.Classes.EmptyLinesAroundClassBraces">
+        <properties>
+            <property name="linesCountAfterOpeningBrace" value="0"/>
+            <property name="linesCountBeforeClosingBrace" value="0"/>
+        </properties>
+    </rule>
+
+    <!-- Clean diffs: trailing commas -->
+    <rule ref="SlevomatCodingStandard.Functions.RequireTrailingCommaInCall"/>
+    <rule ref="SlevomatCodingStandard.Functions.RequireTrailingCommaInDeclaration"/>
+
+    <!-- Modern PHP operators -->
+    <rule ref="SlevomatCodingStandard.ControlStructures.RequireNullCoalesceOperator"/>
+    <rule ref="SlevomatCodingStandard.ControlStructures.RequireShortTernaryOperator"/>
+
+    <!-- Code hygiene -->
+    <rule ref="SlevomatCodingStandard.PHP.UselessParentheses"/>
+    <rule ref="SlevomatCodingStandard.PHP.UselessSemicolon"/>
+</ruleset>

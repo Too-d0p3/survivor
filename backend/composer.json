@@ -41,7 +41,8 @@
         "allow-plugins": {
             "php-http/discovery": true,
             "symfony/flex": true,
-            "symfony/runtime": true
+            "symfony/runtime": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
         },
         "bump-after-update": true,
         "sort-packages": true
@@ -76,7 +77,9 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
-        ]
+        ],
+        "cs:check": "phpcs",
+        "cs:fix": "phpcbf"
     },
     "conflict": {
         "symfony/symfony": "*"
@@ -86,5 +89,9 @@
             "allow-contrib": false,
             "require": "8.0.*"
         }
+    },
+    "require-dev": {
+        "slevomat/coding-standard": "^8.27",
+        "squizlabs/php_codesniffer": "^4.0"
     }
 }
