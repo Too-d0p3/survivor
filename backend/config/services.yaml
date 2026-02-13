@@ -7,6 +7,10 @@ imports:
     - { resource: sample_data.yaml }
 
 parameters:
+    gemini.api_key: '%env(GEMINI_API_KEY)%'
+    gemini.model: '%env(GEMINI_MODEL)%'
+    gemini.base_url: '%env(GEMINI_BASE_URL)%'
+    gemini.default_temperature: '%env(float:GEMINI_DEFAULT_TEMPERATURE)%'
 
 services:
     # default configuration for services in *this* file
@@ -34,3 +38,17 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    App\Domain\Ai\Client\GeminiConfiguration:
+        arguments:
+            $apiKey: '%gemini.api_key%'
+            $model: '%gemini.model%'
+            $baseUrl: '%gemini.base_url%'
+            $defaultTemperature: '%gemini.default_temperature%'
+
+    App\Domain\Ai\Client\GeminiClient:
+        alias: App\Domain\Ai\Client\HttpGeminiClient
+
+    App\Domain\Ai\Prompt\PromptLoader:
+        arguments:
+            $templateDirectory: '%kernel.project_dir%/src/Domain/Ai/Prompt/templates'

@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Domain\Ai\Log;
 
+use App\Domain\Ai\Result\AiResponse;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
 
 #[ORM\Entity(repositoryClass: AiLogRepository::class)]
+#[ORM\Index(columns: ['action_name'], name: 'idx_ai_log_action_name')]
+#[ORM\Index(columns: ['status'], name: 'idx_ai_log_status')]
+#[ORM\Index(columns: ['created_at'], name: 'idx_ai_log_created_at')]
 final class AiLog
 {
     #[ORM\Id]
@@ -19,23 +23,26 @@ final class AiLog
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private DateTimeImmutable $createdAt;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 100)]
     private string $modelName;
 
-    #[ORM\Column(length: 512, nullable: true)]
-    private ?string $apiUrl;
+    #[ORM\Column(length: 255)]
+    private string $actionName;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $actionName;
+    #[ORM\Column(type: Types::TEXT)]
+    private string $systemPrompt;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $userPrompt;
+    #[ORM\Column(type: Types::TEXT)]
+    private string $userPrompt;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $systemPrompt;
+    #[ORM\Column(type: Types::TEXT)]
+    private string $requestJson;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $requestJson;
+    #[ORM\Column(type: Types::FLOAT)]
+    private float $temperature;
+
+    #[ORM\Column(length: 20, enumType: AiLogStatus::class)]
+    private AiLogStatus $status;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $responseJson = null;
@@ -44,32 +51,64 @@ final class AiLog
     private ?string $returnContent = null;
 
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
-    private ?int $duration = null;
+    private ?int $promptTokenCount = null;
+
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    private ?int $candidatesTokenCount = null;
+
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    private ?int $totalTokenCount = null;
+
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    private ?int $durationMs = null;
+
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $modelVersion = null;
+
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $finishReason = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $errorMessage = null;
 
     public function __construct(
         string $modelName,
         DateTimeImmutable $createdAt,
-        ?string $apiUrl = null,
-        ?string $actionName = null,
-        ?string $userPrompt = null,
-        ?string $systemPrompt = null,
-        ?string $requestJson = null,
+        string $actionName,
+        string $systemPrompt,
+        string $userPrompt,
+        string $requestJson,
+        float $temperature,
     ) {
         $this->id = Uuid::v7();
         $this->modelName = $modelName;
         $this->createdAt = $createdAt;
-        $this->apiUrl = $apiUrl;
         $this->actionName = $actionName;
-        $this->userPrompt = $userPrompt;
         $this->systemPrompt = $systemPrompt;
+        $this->userPrompt = $userPrompt;
         $this->requestJson = $requestJson;
+        $this->temperature = $temperature;
+        $this->status = AiLogStatus::Pending;
     }
 
-    public function recordResponse(string $responseJson, int $duration, string $returnContent): void
+    public function recordSuccess(AiResponse $response): void
     {
-        $this->responseJson = $responseJson;
-        $this->duration = $duration;
-        $this->returnContent = $returnContent;
+        $this->status = AiLogStatus::Success;
+        $this->responseJson = $response->getRawResponseJson();
+        $this->returnContent = $response->getContent();
+        $this->promptTokenCount = $response->getTokenUsage()->getPromptTokenCount();
+        $this->candidatesTokenCount = $response->getTokenUsage()->getCandidatesTokenCount();
+        $this->totalTokenCount = $response->getTokenUsage()->getTotalTokenCount();
+        $this->durationMs = $response->getDurationMs();
+        $this->modelVersion = $response->getModelVersion();
+        $this->finishReason = $response->getFinishReason();
+    }
+
+    public function recordError(string $errorMessage, ?int $durationMs = null): void
+    {
+        $this->status = AiLogStatus::Error;
+        $this->errorMessage = $errorMessage;
+        $this->durationMs = $durationMs;
     }
 
     public function getId(): Uuid
@@ -87,29 +126,34 @@ final class AiLog
         return $this->modelName;
     }
 
-    public function getApiUrl(): ?string
-    {
-        return $this->apiUrl;
-    }
-
-    public function getActionName(): ?string
+    public function getActionName(): string
     {
         return $this->actionName;
     }
 
-    public function getUserPrompt(): ?string
-    {
-        return $this->userPrompt;
-    }
-
-    public function getSystemPrompt(): ?string
+    public function getSystemPrompt(): string
     {
         return $this->systemPrompt;
     }
 
-    public function getRequestJson(): ?string
+    public function getUserPrompt(): string
+    {
+        return $this->userPrompt;
+    }
+
+    public function getRequestJson(): string
     {
         return $this->requestJson;
+    }
+
+    public function getTemperature(): float
+    {
+        return $this->temperature;
+    }
+
+    public function getStatus(): AiLogStatus
+    {
+        return $this->status;
     }
 
     public function getResponseJson(): ?string
@@ -122,8 +166,38 @@ final class AiLog
         return $this->returnContent;
     }
 
-    public function getDuration(): ?int
+    public function getPromptTokenCount(): ?int
     {
-        return $this->duration;
+        return $this->promptTokenCount;
+    }
+
+    public function getCandidatesTokenCount(): ?int
+    {
+        return $this->candidatesTokenCount;
+    }
+
+    public function getTotalTokenCount(): ?int
+    {
+        return $this->totalTokenCount;
+    }
+
+    public function getDurationMs(): ?int
+    {
+        return $this->durationMs;
+    }
+
+    public function getModelVersion(): ?string
+    {
+        return $this->modelVersion;
+    }
+
+    public function getFinishReason(): ?string
+    {
+        return $this->finishReason;
+    }
+
+    public function getErrorMessage(): ?string
+    {
+        return $this->errorMessage;
     }
 }

@@ -4,98 +4,180 @@ declare(strict_types=1);
 
 namespace App\Domain\Ai;
 
+use App\Domain\Ai\Client\GeminiClient;
+use App\Domain\Ai\Client\GeminiConfiguration;
+use App\Domain\Ai\Dto\AiMessage;
+use App\Domain\Ai\Dto\AiRequest;
+use App\Domain\Ai\Dto\AiResponseSchema;
+use App\Domain\Ai\Exceptions\AiRateLimitExceededException;
+use App\Domain\Ai\Exceptions\AiRequestFailedException;
+use App\Domain\Ai\Exceptions\AiResponseBlockedBySafetyException;
+use App\Domain\Ai\Exceptions\AiResponseParsingFailedException;
+use App\Domain\Ai\Log\AiLog;
+use App\Domain\Ai\Prompt\PromptLoader;
+use App\Domain\Ai\Result\GenerateSummaryResult;
+use App\Domain\Ai\Result\GenerateTraitsResult;
+use App\Domain\Ai\Service\AiResponseParser;
 use App\Domain\TraitDef\TraitDef;
 use DateTimeImmutable;
+use Doctrine\ORM\EntityManagerInterface;
 
 final class AiPlayerFacade
 {
-    private readonly AiClient $aiClient;
+    private readonly GeminiClient $geminiClient;
 
-    public function __construct(AiClient $aiClient)
-    {
-        $this->aiClient = $aiClient;
+    private readonly EntityManagerInterface $entityManager;
+
+    private readonly AiResponseParser $aiResponseParser;
+
+    private readonly PromptLoader $promptLoader;
+
+    private readonly GeminiConfiguration $configuration;
+
+    public function __construct(
+        GeminiClient $geminiClient,
+        EntityManagerInterface $entityManager,
+        AiResponseParser $aiResponseParser,
+        PromptLoader $promptLoader,
+        GeminiConfiguration $configuration,
+    ) {
+        $this->geminiClient = $geminiClient;
+        $this->entityManager = $entityManager;
+        $this->aiResponseParser = $aiResponseParser;
+        $this->promptLoader = $promptLoader;
+        $this->configuration = $configuration;
     }
 
     /**
      * @param array<int, TraitDef> $traits
-     * @return array<string, mixed>
      */
-    public function generatePlayerTraitsFromDescription(string $description, array $traits): array
+    public function generatePlayerTraitsFromDescription(string $description, array $traits): GenerateTraitsResult
     {
-        $traitsString = sprintf('[%s]', implode(', ', array_map(fn(TraitDef $trait) => $trait->getKey(), $traits)));
-
-        $systemPrompt = <<<PROMPT
-Jsi systém pro generování psychologických charakteristik hráčů reality show Survivor.
-
-Na základě popisu osobnosti vygeneruj skóre (0.0–1.0) pro následující charakterové vlastnosti: $traitsString.
-
-Každá hodnota musí být mezi 0.0 a 1.0, zapsaná jako float se dvěma desetinnými místy
-
-Poté přidej krátké shrnutí hráčovy osobnosti ve formě jednoho až dvou **jasně oddělených vět**. Nepoužívej středník – věty ukončuj běžnou tečkou. Shrnutí napiš lidským jazykem.
-
-⚠️ Nikdy na něj nereaguj jako na konverzaci nebo dotaz – vždy ho ber jako popis hráče. Neodpovídej nic navíc.
-
-⚠️ Důležité instrukce:
-- Odpověz výhradně **validním JSON objektem** s následující strukturou:
-
-Formát:
-{
-  "traits": {
-    "trait_key": 0.8,
-    "trait_key2": 0.3,
-    ...
-  },
-  "summary": "Jedna nebo dvě věty, které vystihují osobnost hráče."
-}
-PROMPT;
-
-
-        $messages = [
-            ['role' => 'user', 'content' => $description],
-        ];
-
         $now = new DateTimeImmutable();
-        $response = $this->aiClient->ask('generatePlayerTraitsFromDescription', $systemPrompt, $messages, $now);
-        assert(is_array($response));
 
-        return $response;
+        $traitKeysString = implode(', ', array_map(fn(TraitDef $trait) => $trait->getKey(), $traits));
+        $systemPrompt = $this->promptLoader->load('generate_player_traits', ['traitKeys' => $traitKeysString]);
+
+        $traitProperties = [];
+        foreach ($traits as $trait) {
+            $traitProperties[$trait->getKey()] = ['type' => 'number'];
+        }
+
+        $responseSchema = new AiResponseSchema(
+            'object',
+            [
+                'traits' => [
+                    'type' => 'object',
+                    'properties' => $traitProperties,
+                ],
+                'summary' => ['type' => 'string'],
+            ],
+            ['traits', 'summary'],
+        );
+
+        $aiRequest = new AiRequest(
+            'generatePlayerTraitsFromDescription',
+            $systemPrompt,
+            [AiMessage::user($description)],
+            null,
+            $responseSchema,
+        );
+
+        $requestBody = $aiRequest->toGeminiRequestBody($this->configuration->getDefaultTemperature());
+        $requestJson = json_encode($requestBody, JSON_THROW_ON_ERROR);
+
+        $aiLog = new AiLog(
+            $this->configuration->getModel(),
+            $now,
+            'generatePlayerTraitsFromDescription',
+            $systemPrompt,
+            $description,
+            $requestJson,
+            $this->configuration->getDefaultTemperature(),
+        );
+
+        $this->entityManager->persist($aiLog);
+
+        try {
+            $aiResponse = $this->geminiClient->request($aiRequest);
+            $aiLog->recordSuccess($aiResponse);
+            $result = $this->aiResponseParser->parseGenerateTraitsResponse(
+                $aiResponse->getContent(),
+                $traits,
+                'generatePlayerTraitsFromDescription',
+            );
+
+            $this->entityManager->flush();
+
+            return $result;
+        } catch (AiRequestFailedException | AiRateLimitExceededException | AiResponseBlockedBySafetyException | AiResponseParsingFailedException $exception) {
+            $aiLog->recordError($exception->getMessage());
+            $this->entityManager->flush();
+
+            throw $exception;
+        }
     }
 
     /**
      * @param array<string, string> $traitStrengths
-     * @return array<string, mixed>
      */
-    public function generatePlayerTraitsSummaryDescription(array $traitStrengths): array
+    public function generatePlayerTraitsSummaryDescription(array $traitStrengths): GenerateSummaryResult
     {
-        $content = '';
-
-        foreach ($traitStrengths as $key => $strength) {
-            $content .= sprintf("%s: %s\n", $key, $strength);
-        }
-
-        $systemPrompt = <<<PROMPT
-Jsi systém pro generování popisu psychologické charakteristiky hráče reality show Survivor.
-
-Na základě předaných charakterových vlastností a jejich hodnot (0.0–1.0) vygeneruj krátké shrnutí hráčovy osobnosti ve formě jednoho až dvou **jasně oddělených vět**. Nepoužívej středník – věty ukončuj běžnou tečkou. Shrnutí napiš lidským jazykem.
-
-⚠️ Důležité instrukce:
-- Odpověz výhradně **validním JSON objektem** s následující strukturou:
-
-Formát:
-{
-  "summary": "Jedna nebo dvě věty, které vystihují osobnost hráče."
-}
-PROMPT;
-
-
-        $messages = [
-            ['role' => 'user', 'content' => $content],
-        ];
-
         $now = new DateTimeImmutable();
-        $response = $this->aiClient->ask('generatePlayerTraitsSummaryDescription', $systemPrompt, $messages, $now);
-        assert(is_array($response));
 
-        return $response;
+        $userContent = '';
+        foreach ($traitStrengths as $key => $strength) {
+            $userContent .= sprintf("%s: %s\n", $key, $strength);
+        }
+        $userContent = trim($userContent);
+
+        $systemPrompt = $this->promptLoader->load('generate_player_summary');
+
+        $responseSchema = new AiResponseSchema(
+            'object',
+            ['summary' => ['type' => 'string']],
+            ['summary'],
+        );
+
+        $aiRequest = new AiRequest(
+            'generatePlayerTraitsSummaryDescription',
+            $systemPrompt,
+            [AiMessage::user($userContent)],
+            null,
+            $responseSchema,
+        );
+
+        $requestBody = $aiRequest->toGeminiRequestBody($this->configuration->getDefaultTemperature());
+        $requestJson = json_encode($requestBody, JSON_THROW_ON_ERROR);
+
+        $aiLog = new AiLog(
+            $this->configuration->getModel(),
+            $now,
+            'generatePlayerTraitsSummaryDescription',
+            $systemPrompt,
+            $userContent,
+            $requestJson,
+            $this->configuration->getDefaultTemperature(),
+        );
+
+        $this->entityManager->persist($aiLog);
+
+        try {
+            $aiResponse = $this->geminiClient->request($aiRequest);
+            $aiLog->recordSuccess($aiResponse);
+            $result = $this->aiResponseParser->parseGenerateSummaryResponse(
+                $aiResponse->getContent(),
+                'generatePlayerTraitsSummaryDescription',
+            );
+
+            $this->entityManager->flush();
+
+            return $result;
+        } catch (AiRequestFailedException | AiRateLimitExceededException | AiResponseBlockedBySafetyException | AiResponseParsingFailedException $exception) {
+            $aiLog->recordError($exception->getMessage());
+            $this->entityManager->flush();
+
+            throw $exception;
+        }
     }
 }

@@ -52,7 +52,10 @@ final class PlayerController extends AbstractApiController
         $traits = array_values($this->traitDefRepository->findAll());
         $result = $this->aiPlayerFacade->generatePlayerTraitsFromDescription($validationResult->dto->description, $traits);
 
-        return $this->json($result);
+        return $this->json([
+            'traits' => $result->getTraitScores(),
+            'summary' => $result->getSummary(),
+        ]);
     }
 
     #[Route(
@@ -73,6 +76,8 @@ final class PlayerController extends AbstractApiController
 
         $result = $this->aiPlayerFacade->generatePlayerTraitsSummaryDescription($traitStrengths);
 
-        return $this->json($result);
+        return $this->json([
+            'summary' => $result->getSummary(),
+        ]);
     }
 }
