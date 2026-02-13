@@ -285,8 +285,9 @@ public function generateTraits(
     Request $request,
     #[CurrentUser] ?User $user,
 ): JsonResponse {
+    $playerId = Uuid::fromString($id);
     $dto = $this->getValidatedDto($request, GenerateTraitsInput::class);
-    $result = $this->playerFacade->generateTraits($id, $dto);
+    $result = $this->playerFacade->generateTraits($playerId, $dto);
 
     return $this->json($result, 200, [], ['groups' => 'player:read']);
 }
@@ -301,11 +302,11 @@ public function generateTraits(
 The infrastructure boundary. The only layer that touches Doctrine, filesystem, external APIs, or system clock.
 
 ```php
-public function generateTraits(string $playerId, GenerateTraitsInput $input): Player
+public function generateTraits(Uuid $playerId, GenerateTraitsInput $input): Player
 {
     $now = new DateTimeImmutable();
     $player = $this->playerRepository->getPlayer($playerId);
-    
+
     $result = $this->playerService->generateTraits($player, $input->description, $now);
 
     $this->entityManager->flush();
@@ -315,10 +316,22 @@ public function generateTraits(string $playerId, GenerateTraitsInput $input): Pl
 ```
 
 - Injects `EntityManagerInterface`, repositories, infrastructure services
-- Fetches entities by ID
+- Fetches entities using repository `get*()` methods (which throw domain exceptions on not-found) — never uses `find*()` + manual null checks in the Facade
 - Obtains current time
 - Passes data/entities/time to Services
 - Calls `$em->flush()` once at the end
+- Does not create trivial pass-through methods for simple reads — Facades orchestrate multi-step operations, they do not proxy single repository calls
+
+```php
+// Wrong — null check belongs in Repository, not Facade
+$game = $this->gameRepository->find($gameId);
+if ($game === null) {
+    throw new GameNotFoundException($gameId);
+}
+
+// Right — Repository get*() handles not-found
+$game = $this->gameRepository->getGame($gameId);
+```
 
 ### 8.3 Service
 
@@ -339,6 +352,28 @@ final class PlayerService
 - No HTTP clients
 - Receives only processed data, entities, and time from Facade
 - When infrastructure access is needed in a loop, Facade passes a `Closure`
+- Method names reflect the use-case action (`deleteGame()`, `startRound()`) — not the internal validation step (`validateOwnership()`, `checkPermissions()`)
+- Methods return the entity or a Result object — not `void` — so the Facade can continue orchestrating with the result
+
+```php
+// Wrong — method named after implementation detail, returns void
+public function validateOwnership(Game $game, User $user): void
+{
+    if ($game->getOwner() !== $user) {
+        throw new CannotDeleteGameBecauseUserIsNotOwnerException($game, $user);
+    }
+}
+
+// Right — method named after use-case, returns entity
+public function deleteGame(Game $game, User $requestingUser): Game
+{
+    if ($game->getOwner() !== $requestingUser) {
+        throw new CannotDeleteGameBecauseUserIsNotOwnerException($game, $requestingUser);
+    }
+
+    return $game;
+}
+```
 
 ---
 
@@ -479,9 +514,38 @@ $qb->select('Player')->from(Player::class, 'Player');
 
 ### 11.3 Repository Methods
 
-- Accept only identifiers (`string` for UUID v7), never entity objects
+- Accept `Uuid` for identifiers — never raw `string`, never entity objects
 - Return typed results — immediately validate/map query output
 - Custom finder methods follow the `find*`/`get*` convention (section 9.1)
+- `get*()` methods throw a domain exception when not found (see section 9.1)
+
+### 11.6 UUID Handling Across Layers
+
+All layers below the Controller work with `Symfony\Component\Uid\Uuid` — never raw strings. The Controller is the only place where `string` → `Uuid` conversion happens.
+
+| Layer | ID type | Responsibility |
+|-------|---------|----------------|
+| **Controller** | `string` → `Uuid` | Converts route parameter to `Uuid` via `Uuid::fromString($id)` |
+| **Facade** | `Uuid` | Passes to Repository/Service as-is |
+| **Service** | `Uuid` | Receives from Facade, works with domain types |
+| **Repository** | `Uuid` | Accepts `Uuid`, consistent with entity `getId(): Uuid` |
+| **Exception** | `Uuid` | Stores `Uuid` context, uses `->toString()` only in message formatting |
+
+```php
+// Controller — conversion at HTTP boundary
+$gameId = Uuid::fromString($id);
+$this->gameFacade->deleteGame($gameId, $user);
+
+// Facade — works with Uuid
+public function deleteGame(Uuid $gameId, User $currentUser): Game
+
+// Repository — accepts Uuid
+public function getGame(Uuid $gameId): Game
+
+// No toString() needed when passing IDs between layers
+$game = $this->gameRepository->getGame($gameId);
+$players = $this->playerRepository->findByGameId($game->getId()); // Uuid → Uuid, clean
+```
 
 ### 11.4 Migrations
 

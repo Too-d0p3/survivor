@@ -109,6 +109,16 @@ When implementing a new feature, follow this pipeline:
 
 For small changes (bug fixes, minor tweaks): skip spec-validator and architects, go directly to implementer → code-review-gatekeeper.
 
+### Critical Patterns All Agents Must Follow
+
+These rules come from CODING_STANDARDS.md and must be enforced by every agent in the pipeline:
+
+1. **Facade uses repository `get*()` methods** — Repository `get*()` throws a domain exception when entity is not found. Facade never calls `find*()` + manual null check. The not-found logic lives in the Repository, not the Facade.
+2. **Facade does not proxy single repository calls** — If a Facade method only wraps a single repository read with no orchestration, it should not exist. Facades are for multi-step operations.
+3. **Service methods are named after the use-case action** — `deleteGame()`, `startRound()`, `assignTraits()` — not after internal steps like `validateOwnership()` or `checkPermissions()`.
+4. **Service methods return the entity or a Result object** — Never `void`. The Facade needs the result to continue orchestrating (persist, flush, return to Controller).
+5. **UUID everywhere below Controller** — Facade, Service, Repository, and Exceptions all use `Symfony\Component\Uid\Uuid` for entity identifiers. Controller converts `string` → `Uuid` via `Uuid::fromString($id)` at the HTTP boundary. No raw `string` IDs below the Controller layer.
+
 ## Key Entities and Relationships
 
 - **User** → owns many **Games**
