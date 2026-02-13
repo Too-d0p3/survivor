@@ -84,20 +84,18 @@ final class AiClient
             $json = $matches[0];
             $decoded = json_decode($json, true);
 
-            $aiLog->recordResponse($responseJson, $duration, $json);
-            $this->entityManager->persist($aiLog);
-            $this->entityManager->flush();
-
             if (json_last_error() !== JSON_ERROR_NONE) {
                 throw new RuntimeException(sprintf('JSON parsing failed: %s', json_last_error_msg()));
             }
+
+            $aiLog->recordResponse($responseJson, $duration, $json);
+            $this->entityManager->flush();
 
             /** @var array<string, mixed> $decoded */
             return $decoded;
         }
 
         $aiLog->recordResponse($responseJson, $duration, $content);
-        $this->entityManager->persist($aiLog);
         $this->entityManager->flush();
 
         return $content;
@@ -120,7 +118,6 @@ final class AiClient
             $requestJson,
         );
         $this->entityManager->persist($log);
-        $this->entityManager->flush();
 
         return $log;
     }

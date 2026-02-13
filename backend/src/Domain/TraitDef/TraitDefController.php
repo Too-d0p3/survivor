@@ -11,18 +11,18 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/api/trait-def', name: 'trait-def_')]
 final class TraitDefController extends AbstractApiController
 {
-    private readonly TraitDefFacade $traitDefFacade;
+    private readonly TraitDefRepository $traitDefRepository;
 
-    public function __construct(TraitDefFacade $traitDefFacade)
+    public function __construct(TraitDefRepository $traitDefRepository)
     {
-        $this->traitDefFacade = $traitDefFacade;
+        $this->traitDefRepository = $traitDefRepository;
     }
 
     #[Route('/', name: '', methods: ['GET'])]
     public function traitDefAction(): JsonResponse
     {
         return $this->json(
-            $this->traitDefFacade->getAll(),
+            array_values($this->traitDefRepository->findAll()),
             200,
             ['Content-Type' => 'application/json; charset=utf-8'],
         );

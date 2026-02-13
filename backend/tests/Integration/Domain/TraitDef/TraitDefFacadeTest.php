@@ -14,13 +14,6 @@ final class TraitDefFacadeTest extends AbstractIntegrationTestCase
 {
     private TraitDefFacade $traitDefFacade;
 
-    public function testGetAllReturnsEmptyArrayWhenNoTraitDefs(): void
-    {
-        $result = $this->traitDefFacade->getAll();
-
-        self::assertSame([], $result);
-    }
-
     public function testCreateTraitDefPersistsInDatabase(): void
     {
         $traitDef = $this->traitDefFacade->createTraitDef(

@@ -45,21 +45,19 @@ final class Player
         $this->playerTraits = new ArrayCollection();
     }
 
-    public function addPlayerTrait(PlayerTrait $playerTrait): static
+    public function addPlayerTrait(PlayerTrait $playerTrait): void
     {
-        if (!$this->playerTraits->contains($playerTrait)) {
-            $this->playerTraits->add($playerTrait);
-            $playerTrait->setPlayer($this);
+        if ($this->playerTraits->contains($playerTrait)) {
+            return;
         }
 
-        return $this;
+        $this->playerTraits->add($playerTrait);
+        $playerTrait->setPlayer($this);
     }
 
-    public function removePlayerTrait(PlayerTrait $playerTrait): static
+    public function removePlayerTrait(PlayerTrait $playerTrait): void
     {
         $this->playerTraits->removeElement($playerTrait);
-
-        return $this;
     }
 
     public function getId(): Uuid
@@ -95,10 +93,8 @@ final class Player
         return $this->playerTraits->toArray();
     }
 
-    public function setGame(Game $game): static
+    public function setGame(Game $game): void
     {
         $this->game = $game;
-
-        return $this;
     }
 }

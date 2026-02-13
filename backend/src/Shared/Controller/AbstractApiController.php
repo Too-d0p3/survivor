@@ -11,15 +11,12 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 abstract class AbstractApiController extends AbstractController
 {
-    /**
-     * @return array{object|null, array<string>}
-     */
     public function getValidatedDto(
         Request $request,
         string $dtoClass,
         SerializerInterface $serializer,
         ValidatorInterface $validator,
-    ): array {
+    ): ValidationResult {
         $data = $request->getContent();
 
         $dto = $serializer->deserialize($data, $dtoClass, 'json');
@@ -32,9 +29,9 @@ abstract class AbstractApiController extends AbstractController
                 $errorMessages[] = sprintf('%s: %s', $error->getPropertyPath(), $error->getMessage());
             }
 
-            return [null, $errorMessages];
+            return new ValidationResult(null, $errorMessages);
         }
 
-        return [$dto, []];
+        return new ValidationResult($dto, []);
     }
 }

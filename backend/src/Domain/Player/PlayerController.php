@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Player;
 
+use App\Domain\Ai\AiPlayerFacade;
+use App\Domain\TraitDef\TraitDefRepository;
 use App\Domain\User\User;
 use App\Dto\Game\Player\GenerateTraitsInput;
 use App\Shared\Controller\AbstractApiController;
@@ -16,11 +18,16 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class PlayerController extends AbstractApiController
 {
-    private readonly PlayerFacade $playerFacade;
+    private readonly AiPlayerFacade $aiPlayerFacade;
 
-    public function __construct(PlayerFacade $playerFacade)
-    {
-        $this->playerFacade = $playerFacade;
+    private readonly TraitDefRepository $traitDefRepository;
+
+    public function __construct(
+        AiPlayerFacade $aiPlayerFacade,
+        TraitDefRepository $traitDefRepository,
+    ) {
+        $this->aiPlayerFacade = $aiPlayerFacade;
+        $this->traitDefRepository = $traitDefRepository;
     }
 
     #[Route('/api/game/player/traits/generate', name: 'game_player_traits_generate', methods: ['POST'])]
@@ -34,15 +41,16 @@ final class PlayerController extends AbstractApiController
             return $this->json(['message' => 'Not authenticated'], 401);
         }
 
-        [$input, $errors] = $this->getValidatedDto($request, GenerateTraitsInput::class, $serializer, $validator);
+        $validationResult = $this->getValidatedDto($request, GenerateTraitsInput::class, $serializer, $validator);
 
-        if ($errors !== []) {
-            return $this->json(['errors' => $errors], 400);
+        if (!$validationResult->isValid()) {
+            return $this->json(['errors' => $validationResult->errors], 400);
         }
 
-        assert($input instanceof GenerateTraitsInput);
+        assert($validationResult->dto instanceof GenerateTraitsInput);
 
-        $result = $this->playerFacade->generatePlayerTraitsFromDescription($input->description);
+        $traits = array_values($this->traitDefRepository->findAll());
+        $result = $this->aiPlayerFacade->generatePlayerTraitsFromDescription($validationResult->dto->description, $traits);
 
         return $this->json($result);
     }
@@ -63,7 +71,7 @@ final class PlayerController extends AbstractApiController
         /** @var array<string, string> $traitStrengths */
         $traitStrengths = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
-        $result = $this->playerFacade->generatePlayerTraitsSummaryDescription($traitStrengths);
+        $result = $this->aiPlayerFacade->generatePlayerTraitsSummaryDescription($traitStrengths);
 
         return $this->json($result);
     }

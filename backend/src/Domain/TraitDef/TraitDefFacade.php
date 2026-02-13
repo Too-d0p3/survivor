@@ -21,14 +21,6 @@ final class TraitDefFacade
         $this->entityManager = $entityManager;
     }
 
-    /**
-     * @return array<int, TraitDef>
-     */
-    public function getAll(): array
-    {
-        return array_values($this->traitDefRepository->findAll());
-    }
-
     public function createTraitDef(
         string $key,
         string $label,

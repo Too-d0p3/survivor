@@ -8,7 +8,7 @@ use App\Domain\TraitDef\TraitDef;
 use RuntimeException;
 use Throwable;
 
-class CannotCreateTraitDefBecauseTraitDefWithSameKeyAlreadyExistsException extends RuntimeException
+final class CannotCreateTraitDefBecauseTraitDefWithSameKeyAlreadyExistsException extends RuntimeException
 {
     private readonly string $key;
 

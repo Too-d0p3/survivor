@@ -53,10 +53,9 @@ final class PlayerTrait
         return $this->player;
     }
 
-    public function setPlayer(Player $player): static
+    public function setPlayer(Player $player): void
     {
         $this->player = $player;
-        return $this;
     }
 
     public function getTraitDef(): TraitDef

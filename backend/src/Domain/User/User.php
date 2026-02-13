@@ -50,21 +50,19 @@ final class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
     }
 
-    public function addGame(Game $game): self
+    public function addGame(Game $game): void
     {
-        if (!$this->games->contains($game)) {
-            $this->games->add($game);
-            $game->setOwner($this);
+        if ($this->games->contains($game)) {
+            return;
         }
 
-        return $this;
+        $this->games->add($game);
+        $game->setOwner($this);
     }
 
-    public function removeGame(Game $game): self
+    public function removeGame(Game $game): void
     {
         $this->games->removeElement($game);
-
-        return $this;
     }
 
     public function getId(): Uuid
@@ -108,9 +106,8 @@ final class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->games->toArray();
     }
 
-    public function setPassword(string $password): self
+    public function setPassword(string $password): void
     {
         $this->password = $password;
-        return $this;
     }
 }

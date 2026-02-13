@@ -43,21 +43,19 @@ final class Game
         $this->players = new ArrayCollection();
     }
 
-    public function addPlayer(Player $player): static
+    public function addPlayer(Player $player): void
     {
-        if (!$this->players->contains($player)) {
-            $this->players->add($player);
-            $player->setGame($this);
+        if ($this->players->contains($player)) {
+            return;
         }
 
-        return $this;
+        $this->players->add($player);
+        $player->setGame($this);
     }
 
-    public function removePlayer(Player $player): static
+    public function removePlayer(Player $player): void
     {
         $this->players->removeElement($player);
-
-        return $this;
     }
 
     public function getId(): Uuid
@@ -88,9 +86,8 @@ final class Game
         return $this->owner;
     }
 
-    public function setOwner(User $owner): static
+    public function setOwner(User $owner): void
     {
         $this->owner = $owner;
-        return $this;
     }
 }

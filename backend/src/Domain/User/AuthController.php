@@ -6,15 +6,14 @@ namespace App\Domain\User;
 
 use App\Domain\User\Exceptions\CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException;
 use App\Dto\RegisterInput;
+use App\Shared\Controller\AbstractApiController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Attribute\AsController;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[AsController]
-final class AuthController
+final class AuthController extends AbstractApiController
 {
     private readonly UserFacade $userFacade;
 
@@ -29,27 +28,20 @@ final class AuthController
         SerializerInterface $serializer,
         ValidatorInterface $validator,
     ): JsonResponse {
-        $data = $request->getContent();
+        $validationResult = $this->getValidatedDto($request, RegisterInput::class, $serializer, $validator);
 
-        /** @var RegisterInput $input */
-        $input = $serializer->deserialize($data, RegisterInput::class, 'json');
-
-        $errors = $validator->validate($input);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[] = sprintf('%s: %s', $error->getPropertyPath(), $error->getMessage());
-            }
-
-            return new JsonResponse(['errors' => $errorMessages], 400);
+        if (!$validationResult->isValid()) {
+            return $this->json(['errors' => $validationResult->errors], 400);
         }
+
+        assert($validationResult->dto instanceof RegisterInput);
 
         try {
-            $this->userFacade->registerUser($input->email, $input->password);
+            $this->userFacade->registerUser($validationResult->dto->email, $validationResult->dto->password);
         } catch (CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException) {
-            return new JsonResponse(['error' => 'User with this email already exists'], 409);
+            return $this->json(['error' => 'User with this email already exists'], 409);
         }
 
-        return new JsonResponse(['message' => 'User registered successfully']);
+        return $this->json(['message' => 'User registered successfully']);
     }
 }

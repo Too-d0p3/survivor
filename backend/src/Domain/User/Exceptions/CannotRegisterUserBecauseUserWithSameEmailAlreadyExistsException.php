@@ -7,7 +7,7 @@ namespace App\Domain\User\Exceptions;
 use RuntimeException;
 use Throwable;
 
-class CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException extends RuntimeException
+final class CannotRegisterUserBecauseUserWithSameEmailAlreadyExistsException extends RuntimeException
 {
     private readonly string $email;
 
