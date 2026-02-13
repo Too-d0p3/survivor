@@ -8,15 +8,15 @@ use App\Domain\Player\Player;
 use App\Domain\TraitDef\TraitDef;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: PlayerTraitRepository::class)]
 final class PlayerTrait
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column]
-    private ?int $id = null;
+    #[ORM\Column(type: 'uuid')]
+    private Uuid $id;
 
     #[ORM\ManyToOne(inversedBy: 'playerTraits')]
     #[ORM\JoinColumn(nullable: false)]
@@ -37,12 +37,13 @@ final class PlayerTrait
 
     public function __construct(Player $player, TraitDef $traitDef, string $strength)
     {
+        $this->id = Uuid::v7();
         $this->player = $player;
         $this->traitDef = $traitDef;
         $this->strength = $strength;
     }
 
-    public function getId(): ?int
+    public function getId(): Uuid
     {
         return $this->id;
     }

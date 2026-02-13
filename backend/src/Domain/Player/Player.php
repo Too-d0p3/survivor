@@ -10,14 +10,14 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Uid\Uuid;
 
 #[ORM\Entity(repositoryClass: PlayerRepository::class)]
 final class Player
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column]
-    private ?int $id = null;
+    #[ORM\Column(type: 'uuid')]
+    private Uuid $id;
 
     #[ORM\Column(length: 255)]
     private string $name;
@@ -38,6 +38,7 @@ final class Player
 
     public function __construct(string $name, bool $isUserControlled, Game $game)
     {
+        $this->id = Uuid::v7();
         $this->name = $name;
         $this->isUserControlled = $isUserControlled;
         $this->game = $game;
@@ -61,7 +62,7 @@ final class Player
         return $this;
     }
 
-    public function getId(): ?int
+    public function getId(): Uuid
     {
         return $this->id;
     }

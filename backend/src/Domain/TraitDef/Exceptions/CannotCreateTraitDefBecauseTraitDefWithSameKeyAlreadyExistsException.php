@@ -25,7 +25,7 @@ class CannotCreateTraitDefBecauseTraitDefWithSameKeyAlreadyExistsException exten
         parent::__construct(
             sprintf(
                 'Cannot create trait definition with key `%s`'
-                . ' because trait definition `%d` with same key already exists',
+                . ' because trait definition `%s` with same key already exists',
                 $key,
                 $this->existingTraitDef->getId(),
             ),

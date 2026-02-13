@@ -11,14 +11,14 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Uid\Uuid;
 
 #[ORM\Entity(repositoryClass: GameRepository::class)]
 final class Game
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column]
-    private ?int $id = null;
+    #[ORM\Column(type: 'uuid')]
+    private Uuid $id;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private DateTimeImmutable $createdAt;
@@ -36,6 +36,7 @@ final class Game
 
     public function __construct(User $owner, bool $isSandbox, DateTimeImmutable $createdAt)
     {
+        $this->id = Uuid::v7();
         $this->owner = $owner;
         $this->isSandbox = $isSandbox;
         $this->createdAt = $createdAt;
@@ -59,7 +60,7 @@ final class Game
         return $this;
     }
 
-    public function getId(): ?int
+    public function getId(): Uuid
     {
         return $this->id;
     }

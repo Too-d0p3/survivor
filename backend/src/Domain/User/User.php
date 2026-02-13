@@ -11,16 +11,16 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Uid\Uuid;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: "app_user")]
 final class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column]
+    #[ORM\Column(type: 'uuid')]
     #[Groups(['user:read'])]
-    private ?int $id = null;
+    private Uuid $id;
 
     #[ORM\Column(length: 180, unique: true)]
     #[Groups(['user:read'])]
@@ -41,6 +41,7 @@ final class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function __construct(
         string $email,
     ) {
+        $this->id = Uuid::v7();
         $this->email = $email;
         $this->games = new ArrayCollection();
     }
@@ -66,7 +67,7 @@ final class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getId(): ?int
+    public function getId(): Uuid
     {
         return $this->id;
     }

@@ -7,14 +7,14 @@ namespace App\Domain\Ai\Log;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Uid\Uuid;
 
 #[ORM\Entity(repositoryClass: AiLogRepository::class)]
 final class AiLog
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column(type: Types::INTEGER)]
-    private ?int $id = null;
+    #[ORM\Column(type: 'uuid')]
+    private Uuid $id;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private DateTimeImmutable $createdAt;
@@ -55,6 +55,7 @@ final class AiLog
         ?string $systemPrompt = null,
         ?string $requestJson = null,
     ) {
+        $this->id = Uuid::v7();
         $this->modelName = $modelName;
         $this->createdAt = $createdAt;
         $this->apiUrl = $apiUrl;
@@ -71,7 +72,7 @@ final class AiLog
         $this->returnContent = $returnContent;
     }
 
-    public function getId(): ?int
+    public function getId(): Uuid
     {
         return $this->id;
     }
