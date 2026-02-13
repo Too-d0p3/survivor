@@ -281,7 +281,7 @@ Handles HTTP only. Deserializes input, validates, dispatches to Facade, serializ
 ```php
 #[Route('/api/players/{id}/traits', methods: ['POST'])]
 public function generateTraits(
-    int $id,
+    string $id,
     Request $request,
     #[CurrentUser] ?User $user,
 ): JsonResponse {
@@ -301,7 +301,7 @@ public function generateTraits(
 The infrastructure boundary. The only layer that touches Doctrine, filesystem, external APIs, or system clock.
 
 ```php
-public function generateTraits(int $playerId, GenerateTraitsInput $input): Player
+public function generateTraits(string $playerId, GenerateTraitsInput $input): Player
 {
     $now = new DateTimeImmutable();
     $player = $this->playerRepository->getPlayer($playerId);
@@ -421,20 +421,20 @@ Extend `RuntimeException`. Accept context data in constructor. Provide typed get
 ```php
 final class PlayerNotFoundException extends RuntimeException
 {
-    private readonly int $playerId;
+    private readonly string $playerId;
 
-    public function __construct(int $playerId, ?Throwable $previous = null)
+    public function __construct(string $playerId, ?Throwable $previous = null)
     {
         $this->playerId = $playerId;
 
         parent::__construct(
-            sprintf('Player with ID %d not found', $playerId),
+            sprintf('Player with ID %s not found', $playerId),
             0,
             $previous,
         );
     }
 
-    public function getPlayerId(): int
+    public function getPlayerId(): string
     {
         return $this->playerId;
     }
@@ -479,7 +479,7 @@ $qb->select('Player')->from(Player::class, 'Player');
 
 ### 11.3 Repository Methods
 
-- Accept only scalar IDs, never entity objects
+- Accept only identifiers (`string` for UUID v7), never entity objects
 - Return typed results — immediately validate/map query output
 - Custom finder methods follow the `find*`/`get*` convention (section 9.1)
 

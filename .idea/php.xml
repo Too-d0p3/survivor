@@ -116,6 +116,8 @@
       <path value="$PROJECT_DIR$/backend/vendor/phpstan/phpstan-symfony" />
       <path value="$PROJECT_DIR$/backend/vendor/phpstan/phpstan" />
       <path value="$PROJECT_DIR$/backend/vendor/phpstan/phpstan-strict-rules" />
+      <path value="$PROJECT_DIR$/backend/vendor/symfony/polyfill-uuid" />
+      <path value="$PROJECT_DIR$/backend/vendor/symfony/uid" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.5">

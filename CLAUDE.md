@@ -53,7 +53,6 @@ npm run migrate    # Makes migration, runs it, regenerates client types
 
 Code is organized into domains under `backend/src/Domain/`:
 - **Ai** — AI client, logging, trait inference services
-- **AiLog** — AI interaction audit trail (prompt, response, duration, metadata)
 - **Game** — Core game loop and state management
 - **Player** — Character entities, traits, relationship states
 - **TraitDef** — Personality trait definitions (social/strategic/emotional/physical types)
@@ -96,6 +95,20 @@ PHPStan runs at level max with strict rules. Existing violations are captured in
 - **No abbreviations** — use full words (e.g. "introduce" not "intro", "configuration" not "config")
 - **Lowercase** — do not capitalize the first letter
 
+## Agent Workflow
+
+When implementing a new feature, follow this pipeline:
+
+1. **spec-validator** — Clarify requirements: ask questions, flag ambiguities, produce a Feature Brief. Blocks if critical info is missing.
+2. **architect** — Design the feature: use-case spec, API contract, method signatures, domain errors, Result objects. Produces the blueprint.
+3. **entity-persistence-architect** — If entities/schema change: design entities, migrations, repository methods, indexes.
+4. **prompt-architect** — If AI/LLM interaction needed: design prompt spec, input/output contracts.
+5. **implementer** — Implement the code following architect specs. Run PHPCS + PHPStan.
+6. **test-qa-engineer** — Write unit tests for Services, integration tests for Facades.
+7. **code-review-gatekeeper** — Final review before commit. Block any violations.
+
+For small changes (bug fixes, minor tweaks): skip spec-validator and architects, go directly to implementer → code-review-gatekeeper.
+
 ## Key Entities and Relationships
 
 - **User** → owns many **Games**
@@ -103,4 +116,3 @@ PHPStan runs at level max with strict rules. Existing violations are captured in
 - **Player** → has many **PlayerTraits** (name, description, user_controlled flag)
 - **PlayerTrait** → links Player to **TraitDef** with strength (0.0–1.0)
 - **TraitDef** — key (unique), label, description, type (social/strategic/emotional/physical)
-- **AiLog** — full audit of every AI interaction

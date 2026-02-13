@@ -23,7 +23,7 @@ This file provides context and instructions for AI agents working on the AI Surv
     - `Player`: Character entities, traits, and relationship states.
     - `TraitDef`: Definitions for personality traits.
     - `User`: Authentication and user management.
-- **AI Logging:** Every AI interaction is logged in the `ai_log` table for debugging and auditing (`AiLog` entity).
+- **AI Logging:** AI interaction logging lives within the Ai domain.
 - **Sample Data:** Custom sample data system in `src/Shared/SampleData/` for seeding the simulation.
 
 ### Frontend (`/frontend`)
