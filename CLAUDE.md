@@ -116,3 +116,5 @@ For small changes (bug fixes, minor tweaks): skip spec-validator and architects,
 - **Player** → has many **PlayerTraits** (name, description, user_controlled flag)
 - **PlayerTrait** → links Player to **TraitDef** with strength (0.0–1.0)
 - **TraitDef** — key (unique), label, description, type (social/strategic/emotional/physical)
+
+**IGNORE FRONTEND CODE** — focus on backend for now. Frontend is basic and will be refactored later.
