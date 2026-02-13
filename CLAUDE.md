@@ -157,6 +157,7 @@ docker-compose exec php php bin/console doctrine:migrations:migrate --env=test -
 - **Imperative mood** — e.g. "add player endpoint", not "added player endpoint"
 - **No abbreviations** — use full words (e.g. "introduce" not "intro", "configuration" not "config")
 - **Lowercase** — do not capitalize the first letter
+- **No Co-authored-by**
 
 ## Agent Workflow
 
