@@ -22,30 +22,35 @@ This project follows a strict **Controller → Facade → Service** pattern:
 
 3. **Controllers** — Request/Response only. Typically tested via functional/API tests if needed, but your primary focus is Services and Facades.
 
-## Test Structure
+## Test Infrastructure
 
-**Note:** The `backend/tests/` directory does not yet exist and needs to be created. The PSR-4 autoload mapping `App\Tests\` → `tests/` is already configured in `composer.json`.
+- **PHPUnit 12** with three test suites: `unit`, `integration`, `functional`
+- **DAMA DoctrineTestBundle** wraps each test in a DB transaction → automatic rollback after each test
+- **Test database:** `survivor_test` (Doctrine `when@test` auto-suffixes `_test`)
+- **Config:** `backend/phpunit.xml.dist`, `backend/.env.test`, `backend/tests/bootstrap.php`
+- **Base classes:** `AbstractIntegrationTestCase` (extends `KernelTestCase`), `AbstractFunctionalTestCase` (extends `WebTestCase`)
+- **Running:** `composer test`, `composer test:unit`, `composer test:integration`, `composer test:functional`, `composer qa`
+
+## Test Structure
 
 All tests go under `backend/tests/` mirroring the source structure:
 ```
 backend/tests/
-  Unit/
-    Domain/
-      Player/
-        PlayerServiceTest.php
-      Game/
-        GameServiceTest.php
-      Ai/
-        AiPlayerServiceTest.php
-  Integration/
-    Domain/
-      Player/
-        PlayerFacadeTest.php
-      Game/
-        GameFacadeTest.php
+├── bootstrap.php
+├── Unit/
+│   └── Domain/
+│       └── {Domain}/{Entity|Service}Test.php
+├── Integration/
+│   ├── AbstractIntegrationTestCase.php
+│   └── Domain/
+│       └── {Domain}/{Facade}Test.php
+└── Functional/
+    ├── AbstractFunctionalTestCase.php
+    └── Domain/
+        └── {Domain}/{Controller}Test.php
 ```
 
-**Current state:** No Service classes exist yet — business logic is currently in Facades. As Services are extracted, create corresponding unit tests. All entity IDs are UUID v7 (`Symfony\Component\Uid\Uuid`) — use `Uuid::v7()` in test fixtures.
+All entity IDs are UUID v7 (`Symfony\Component\Uid\Uuid`) — use real entity constructors in test fixtures (they auto-generate UUIDs).
 
 ## Unit Test Guidelines (for Services)
 
@@ -64,10 +69,10 @@ backend/tests/
 
 ## Integration Test Guidelines (for Facades)
 
-- Extend the appropriate Symfony test case (e.g., `KernelTestCase` or a project-specific base).
-- Use `EntityManager` to set up test data in the database before calling Facade methods.
-- Assert both return values AND database state after Facade calls.
-- Use transactions and rollback (or `@doesNotPerformAssertions` cleanup) to keep test isolation.
+- Extend `AbstractIntegrationTestCase` (which extends `KernelTestCase`).
+- Use the base class helpers: `getService()` to fetch Facade from container, `getEntityManager()` for assertions, `createAndPersistUser()` for user fixtures.
+- DAMA DoctrineTestBundle auto-rollbacks each test — no manual cleanup needed.
+- Assert both return values AND database state after Facade calls (use `$this->getEntityManager()->find()`).
 - Test that `flush()` is called and data persists correctly.
 - Test error paths: what happens when an entity isn't found, when constraints are violated.
 

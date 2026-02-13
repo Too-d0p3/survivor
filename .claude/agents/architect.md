@@ -170,6 +170,13 @@ public function castVote(Game $game, Player $voter, Player $target, ?string $rea
 - Facade: DateTimeImmutable originates here only, flush exactly once at end
 - All domain exceptions mapped to HTTP statuses
 
+### Testing Guardrails
+- Every design must specify which tests are needed (unit, integration, functional)
+- Service methods → unit tests (no mocks, real entities)
+- Facade methods → integration tests (real DB via `AbstractIntegrationTestCase`)
+- Controller endpoints → functional tests (HTTP via `AbstractFunctionalTestCase`)
+- `composer qa` (PHPCS + PHPStan + tests) must pass
+
 ### Architecture Guardrails
 - No circular domain dependencies
 - No shortcuts that violate coding standards

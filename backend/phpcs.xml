@@ -4,6 +4,7 @@
 
     <!-- Scan paths -->
     <file>src</file>
+    <file>tests</file>
 
     <!-- Show progress and use colors -->
     <arg value="ps"/>

@@ -142,18 +142,21 @@ For every coding task, follow this exact sequence:
 
 3. **Write the Code** — Implement following all standards above. Start with entities and work outward: Entity → Repository → Service → Facade → Controller → DTO/Result.
 
-4. **Write Tests** — Every new feature or bug fix MUST have tests. Test services with unit tests. Test facades/controllers with integration tests where appropriate.
+4. **Write Tests** — Every new feature or bug fix MUST have tests:
+   - **Unit tests** for Services and Entities — extend `TestCase`, no mocks, use real entity objects
+   - **Integration tests** for Facades — extend `AbstractIntegrationTestCase` (`KernelTestCase` + DAMA rollback), use `getService()` and `createAndPersistUser()` helpers
+   - **Functional tests** for Controllers — extend `AbstractFunctionalTestCase` (`WebTestCase`), use `getBrowser()` and `jsonRequest()` helpers
+   - Test naming: `test[MethodName][Scenario]` — e.g. `testDeleteGameWhenUserIsNotOwnerThrowsException`
 
 5. **Create Migrations** — After any entity change, run `php bin/console make:migration` via Docker.
 
 6. **Update Seed Data** — If new TraitDefs, default data, or sample data is needed, update the sample data command.
 
-7. **Verify Standards** — Run these commands and fix ALL issues before considering the work done:
+7. **Verify Standards** — Run this single command and fix ALL issues before considering the work done:
    ```bash
-   docker-compose exec php composer cs:check
-   docker-compose exec php composer stan
+   docker-compose exec php composer qa
    ```
-   If `cs:check` fails, run `docker-compose exec php composer cs:fix` first, then verify again.
+   This runs PHPCS + PHPStan + all tests. If `cs:check` fails, run `docker-compose exec php composer cs:fix` first, then re-run `qa`.
 
 8. **Regenerate Client Types** — If API endpoints changed, run `npm run generate-client` from `frontend/`.
 
@@ -168,9 +171,13 @@ For every coding task, follow this exact sequence:
 
 - PHPCS must pass with ZERO errors (`composer cs:check`)
 - PHPStan at level max must pass with ZERO new errors (`composer stan`)
-- All existing tests must continue to pass
-- New code must have test coverage
+- All tests must pass (`composer test`) — unit, integration, and functional
+- **Every new Service method** must have unit tests in `tests/Unit/Domain/{Domain}/`
+- **Every new Facade method** must have integration tests in `tests/Integration/Domain/{Domain}/`
+- **Every new Entity** must have unit tests for constructor and collection methods
+- **Every new Controller endpoint** must have functional tests in `tests/Functional/Domain/{Domain}/`
 - No new PHPStan baseline entries for new code
+- Use `composer qa` to run the full pipeline (PHPCS + PHPStan + tests) before considering work done
 
 ## Self-Verification Protocol
 
@@ -185,9 +192,8 @@ After writing any PHP code, mentally walk through this checklist:
 - [ ] Repository method parameters are scalar IDs?
 - [ ] Controller has zero business logic?
 - [ ] Service has zero infrastructure dependencies?
-- [ ] Tests written for new/changed logic?
-- [ ] PHPCS passes?
-- [ ] PHPStan passes?
+- [ ] Tests written for new/changed logic? (unit for Services/Entities, integration for Facades, functional for Controllers)
+- [ ] `composer qa` passes? (PHPCS + PHPStan + all tests)
 
 If ANY item fails, fix it before proceeding.
 

@@ -62,11 +62,16 @@ Repository methods that accept an Entity object where they should accept an iden
 ### 8. Heterogeneous Array Returned Instead of Result Object
 Methods returning associative arrays or mixed-type arrays for structured data instead of a proper typed Result/DTO object is a blocker. Arrays are acceptable only for homogeneous collections of a single type.
 
-### 9. Missing Tests for Pure Logic
-Any Service containing pure business logic without corresponding unit tests is a blocker. Since Services have no infrastructure dependencies, they are inherently testable and MUST be tested.
+### 9. Missing Tests
+Any code change without corresponding tests is a blocker:
+- **New Service method** without unit test in `tests/Unit/Domain/{Domain}/` → blocker
+- **New Facade method** without integration test in `tests/Integration/Domain/{Domain}/` → blocker
+- **New Entity** without unit test for constructor and collection methods → blocker
+- **New Controller endpoint** without functional test in `tests/Functional/Domain/{Domain}/` → blocker
+- **Bug fix** without a regression test → blocker
 
-### 10. PHPCS / PHPStan Failures
-If you can identify code that would clearly fail PHPCS or PHPStan (type errors, missing return types, incorrect docblocks, style violations), flag it as a blocker. Remind that `composer cs:check` and `composer stan` must pass.
+### 10. PHPCS / PHPStan / Test Failures
+If you can identify code that would clearly fail PHPCS, PHPStan, or tests, flag it as a blocker. Remind that `composer qa` (PHPCS + PHPStan + all tests) must pass.
 
 ## Non-Blocking Issues (Nitpicks)
 
@@ -86,7 +91,7 @@ Flag these as recommendations, not blockers:
 2. **Read each file carefully**: Understand the class's role (Controller, Facade, Service, Entity, DTO, Repository, etc.) based on its namespace and location.
 3. **Check each blocking rule systematically**: Go through all 10 blocking rules for every file.
 4. **Note nitpicks**: Capture any non-blocking improvements.
-5. **Run verification commands**: Execute `docker-compose exec php composer cs:check` and `docker-compose exec php composer stan` to verify standards compliance.
+5. **Run verification commands**: Execute `docker-compose exec php composer qa` to verify standards compliance (PHPCS + PHPStan + all tests).
 6. **Compile the review**: Produce a structured report.
 
 ## Output Format
@@ -121,9 +126,10 @@ Produce your review in this exact format:
 
 ---
 
-### PHPCS/PHPStan Results
+### QA Results (`composer qa`)
 - PHPCS: [PASS ✅ | FAIL 🚫 — details]
 - PHPStan: [PASS ✅ | FAIL 🚫 — details]
+- Tests: [PASS ✅ | FAIL 🚫 — details]
 ```
 
 If there are ANY blockers, the verdict MUST be **REQUEST CHANGES 🚫**. Only give **APPROVED ✅** when zero blockers are found.

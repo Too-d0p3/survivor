@@ -5,12 +5,15 @@ includes:
     - vendor/phpstan/phpstan-symfony/extension.neon
     - vendor/phpstan/phpstan-symfony/rules.neon
     - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/phpstan/phpstan-phpunit/extension.neon
+    - vendor/phpstan/phpstan-phpunit/rules.neon
 
 parameters:
     phpVersion: 80500
     level: max
     paths:
         - src/
+        - tests/
     reportUnmatchedIgnoredErrors: true
     ignoreErrors:
         -

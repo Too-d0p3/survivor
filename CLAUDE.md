@@ -88,6 +88,69 @@ docker-compose exec php composer stan
 ```
 PHPStan runs at level max with strict rules. Existing violations are captured in `phpstan-baseline.neon` — new code must not introduce new errors. To regenerate the baseline (e.g. after fixing baselined errors), run `docker-compose exec php composer stan:baseline`.
 
+## Testing
+
+**Tests are mandatory.** Every new feature, bug fix, or code change must include corresponding tests. Every commit must pass `composer test` with zero errors.
+
+### Test Infrastructure
+
+- **PHPUnit 12** — test runner
+- **DAMA DoctrineTestBundle** — wraps each test in a DB transaction and rolls back after (fast isolation)
+- **Test database:** `survivor_test` (auto-suffixed by Doctrine `when@test`)
+
+### Test Types and Structure
+
+```
+backend/tests/
+├── Unit/           # Pure logic tests — no DB, no mocks, no kernel
+│   └── Domain/
+│       └── {Domain}/{Service|Entity}Test.php
+├── Integration/    # Real DB tests via KernelTestCase + DAMA rollback
+│   ├── AbstractIntegrationTestCase.php
+│   └── Domain/
+│       └── {Domain}/{Facade}Test.php
+└── Functional/     # HTTP tests via WebTestCase
+    ├── AbstractFunctionalTestCase.php
+    └── Domain/
+        └── {Domain}/{Controller}Test.php
+```
+
+| Layer | Test type | Base class | Mocks allowed? |
+|-------|-----------|------------|----------------|
+| Entity | Unit | `TestCase` | Never |
+| Service | Unit | `TestCase` | Never — Services are pure, use real entities |
+| Facade | Integration | `AbstractIntegrationTestCase` (`KernelTestCase`) | Only AiClient (external API) |
+| Controller | Functional | `AbstractFunctionalTestCase` (`WebTestCase`) | Only AiClient |
+
+### Running Tests
+
+```bash
+docker-compose exec php composer test              # All tests
+docker-compose exec php composer test:unit          # Unit only (fast, no DB)
+docker-compose exec php composer test:integration   # Integration (with DB)
+docker-compose exec php composer test:functional    # Functional (HTTP + DB)
+docker-compose exec php composer qa                 # PHPCS + PHPStan + all tests
+```
+
+### Test Naming Convention
+
+`test[MethodName][Scenario]` — e.g. `testDeleteGameWhenUserIsNotOwnerThrowsException`
+
+### What Must Be Tested
+
+Every new piece of code requires tests:
+1. **New Service method** → unit test in `tests/Unit/Domain/{Domain}/`
+2. **New Facade method** → integration test in `tests/Integration/Domain/{Domain}/`
+3. **New Entity** → unit test for constructor, collection methods, and business methods
+4. **New Controller endpoint** → functional test in `tests/Functional/Domain/{Domain}/`
+
+### Test Database Setup (one-time)
+
+```bash
+docker-compose exec php php bin/console doctrine:database:create --env=test --if-not-exists
+docker-compose exec php php bin/console doctrine:migrations:migrate --env=test --no-interaction
+```
+
 ## Commit Messages
 
 - **Subject line only** — no commit description/body
@@ -103,11 +166,11 @@ When implementing a new feature, follow this pipeline:
 2. **architect** — Design the feature: use-case spec, API contract, method signatures, domain errors, Result objects. Produces the blueprint.
 3. **entity-persistence-architect** — If entities/schema change: design entities, migrations, repository methods, indexes.
 4. **prompt-architect** — If AI/LLM interaction needed: design prompt spec, input/output contracts.
-5. **implementer** — Implement the code following architect specs. Run PHPCS + PHPStan.
-6. **test-qa-engineer** — Write unit tests for Services, integration tests for Facades.
-7. **code-review-gatekeeper** — Final review before commit. Block any violations.
+5. **implementer** — Implement the code following architect specs. Run PHPCS + PHPStan. **Must write tests for all new code.**
+6. **test-qa-engineer** — Review test coverage, add missing tests, write edge-case and boundary tests.
+7. **code-review-gatekeeper** — Final review before commit. Block any violations, **including missing tests.**
 
-For small changes (bug fixes, minor tweaks): skip spec-validator and architects, go directly to implementer → code-review-gatekeeper.
+For small changes (bug fixes, minor tweaks): skip spec-validator and architects, go directly to implementer → code-review-gatekeeper. **Tests are still mandatory even for small changes.**
 
 ### Critical Patterns All Agents Must Follow
 
@@ -118,6 +181,7 @@ These rules come from CODING_STANDARDS.md and must be enforced by every agent in
 3. **Service methods are named after the use-case action** — `deleteGame()`, `startRound()`, `assignTraits()` — not after internal steps like `validateOwnership()` or `checkPermissions()`.
 4. **Service methods return the entity or a Result object** — Never `void`. The Facade needs the result to continue orchestrating (persist, flush, return to Controller).
 5. **UUID everywhere below Controller** — Facade, Service, Repository, and Exceptions all use `Symfony\Component\Uid\Uuid` for entity identifiers. Controller converts `string` → `Uuid` via `Uuid::fromString($id)` at the HTTP boundary. No raw `string` IDs below the Controller layer.
+6. **Every code change must have tests** — No code is committed without corresponding tests. Unit tests for Services/Entities, integration tests for Facades, functional tests for Controllers. `composer qa` (PHPCS + PHPStan + tests) must pass before every commit.
 
 ## Key Entities and Relationships
 
