@@ -49,6 +49,9 @@ services:
     App\Domain\Ai\Client\GeminiClient:
         alias: App\Domain\Ai\Client\HttpGeminiClient
 
+    App\Domain\Ai\AiExecutor:
+        alias: App\Domain\Ai\Orchestrator\AiOrchestrator
+
     App\Domain\Ai\Prompt\PromptLoader:
         arguments:
             $templateDirectory: '%kernel.project_dir%/src/Domain/Ai/Prompt/templates'

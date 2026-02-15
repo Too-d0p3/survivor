@@ -354,6 +354,7 @@ final class PlayerService
 - When infrastructure access is needed in a loop, Facade passes a `Closure`
 - Method names reflect the use-case action (`deleteGame()`, `startRound()`) — not the internal validation step (`validateOwnership()`, `checkPermissions()`)
 - Methods return the entity or a Result object — not `void` — so the Facade can continue orchestrating with the result
+- **Exception — `AiExecutor` dependency:** Services may depend on the `AiExecutor` interface because AI call composition requires orchestrating multiple AI operations within pure business logic. The interface has no infrastructure coupling and is fully testable via anonymous-class stubs.
 
 ```php
 // Wrong — method named after implementation detail, returns void
