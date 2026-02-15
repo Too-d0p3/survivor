@@ -15,12 +15,14 @@ use App\Domain\Ai\Exceptions\AiResponseBlockedBySafetyException;
 use App\Domain\Ai\Exceptions\AiResponseParsingFailedException;
 use App\Domain\Ai\Log\AiLog;
 use App\Domain\Ai\Prompt\PromptLoader;
+use App\Domain\Ai\Result\GenerateBatchSummaryResult;
 use App\Domain\Ai\Result\GenerateSummaryResult;
 use App\Domain\Ai\Result\GenerateTraitsResult;
 use App\Domain\Ai\Service\AiResponseParser;
 use App\Domain\TraitDef\TraitDef;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use InvalidArgumentException;
 
 final class AiPlayerFacade
 {
@@ -123,24 +125,46 @@ final class AiPlayerFacade
      */
     public function generatePlayerTraitsSummaryDescription(array $traitStrengths): GenerateSummaryResult
     {
+        $batchResult = $this->generateBatchPlayerTraitsSummaryDescriptions([$traitStrengths]);
+
+        return new GenerateSummaryResult($batchResult->getSummaries()[0]);
+    }
+
+    /**
+     * @param array<int, array<string, string>> $playerTraitStrengths
+     */
+    public function generateBatchPlayerTraitsSummaryDescriptions(array $playerTraitStrengths): GenerateBatchSummaryResult
+    {
         $now = new DateTimeImmutable();
 
-        $userContent = '';
-        foreach ($traitStrengths as $key => $strength) {
-            $userContent .= sprintf("%s: %s\n", $key, $strength);
-        }
-        $userContent = trim($userContent);
+        $playerTraitStrengths = $this->validateAndFormatBatchTraitStrengths($playerTraitStrengths);
 
-        $systemPrompt = $this->promptLoader->load('generate_player_summary');
+        $userContent = $this->formatBatchTraitStrengthsMessage($playerTraitStrengths);
+        $systemPrompt = $this->promptLoader->load('generate_batch_player_summaries');
 
         $responseSchema = new AiResponseSchema(
             'object',
-            ['summary' => ['type' => 'string']],
-            ['summary'],
+            [
+                'summaries' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'player_index' => [
+                                'type' => 'integer',
+                                'description' => '1-based index matching input player order',
+                            ],
+                            'summary' => ['type' => 'string'],
+                        ],
+                        'required' => ['player_index', 'summary'],
+                    ],
+                ],
+            ],
+            ['summaries'],
         );
 
         $aiRequest = new AiRequest(
-            'generatePlayerTraitsSummaryDescription',
+            'generateBatchPlayerTraitsSummaryDescriptions',
             $systemPrompt,
             [AiMessage::user($userContent)],
             null,
@@ -153,7 +177,7 @@ final class AiPlayerFacade
         $aiLog = new AiLog(
             $this->configuration->getModel(),
             $now,
-            'generatePlayerTraitsSummaryDescription',
+            'generateBatchPlayerTraitsSummaryDescriptions',
             $systemPrompt,
             $userContent,
             $requestJson,
@@ -165,9 +189,10 @@ final class AiPlayerFacade
         try {
             $aiResponse = $this->geminiClient->request($aiRequest);
             $aiLog->recordSuccess($aiResponse);
-            $result = $this->aiResponseParser->parseGenerateSummaryResponse(
+            $result = $this->aiResponseParser->parseGenerateBatchSummaryResponse(
                 $aiResponse->getContent(),
-                'generatePlayerTraitsSummaryDescription',
+                count($playerTraitStrengths),
+                'generateBatchPlayerTraitsSummaryDescriptions',
             );
 
             $this->entityManager->flush();
@@ -179,5 +204,55 @@ final class AiPlayerFacade
 
             throw $exception;
         }
+    }
+
+    /**
+     * @param array<int, array<string, string>> $playerTraitStrengths
+     * @return array<int, array<string, string>>
+     */
+    private function validateAndFormatBatchTraitStrengths(array $playerTraitStrengths): array
+    {
+        foreach ($playerTraitStrengths as $playerIndex => $traits) {
+            foreach ($traits as $key => $value) {
+                if (!is_numeric($value)) {
+                    throw new InvalidArgumentException(
+                        sprintf('Trait strength value for "%s" is not numeric', $key),
+                    );
+                }
+
+                $floatValue = (float) $value;
+
+                if ($floatValue < 0.0 || $floatValue > 1.0) {
+                    throw new InvalidArgumentException(
+                        sprintf('Trait strength value for "%s" is out of range [0.0, 1.0]: %s', $key, $value),
+                    );
+                }
+
+                $playerTraitStrengths[$playerIndex][$key] = number_format($floatValue, 2, '.', '');
+            }
+        }
+
+        return $playerTraitStrengths;
+    }
+
+    /**
+     * @param array<int, array<string, string>> $playerTraitStrengths
+     */
+    private function formatBatchTraitStrengthsMessage(array $playerTraitStrengths): string
+    {
+        $parts = [];
+
+        foreach (array_values($playerTraitStrengths) as $index => $traits) {
+            $playerNumber = $index + 1;
+            $lines = [sprintf('Hráč %d:', $playerNumber)];
+
+            foreach ($traits as $key => $strength) {
+                $lines[] = sprintf('%s: %s', $key, $strength);
+            }
+
+            $parts[] = implode("\n", $lines);
+        }
+
+        return implode("\n\n", $parts);
     }
 }

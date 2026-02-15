@@ -119,6 +119,72 @@ final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
         self::assertSame('Summary from traits.', $result->getSummary());
     }
 
+    public function testGenerateBatchPlayerTraitsSummaryDescriptionsReturnsBatchResult(): void
+    {
+        $this->setUpMockGeminiClientForBatchSummary();
+
+        $playerTraitStrengths = [
+            ['leadership' => '0.85', 'empathy' => '0.60'],
+            ['leadership' => '0.30', 'empathy' => '0.90'],
+        ];
+
+        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
+        $result = $aiPlayerFacade->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths);
+
+        self::assertSame(['Leader summary.', 'Empath summary.'], $result->getSummaries());
+    }
+
+    public function testGenerateBatchPlayerTraitsSummaryDescriptionsPersistsAiLog(): void
+    {
+        $this->setUpMockGeminiClientForBatchSummary();
+
+        $playerTraitStrengths = [
+            ['leadership' => '0.85', 'empathy' => '0.60'],
+            ['leadership' => '0.30', 'empathy' => '0.90'],
+        ];
+
+        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
+        $aiPlayerFacade->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths);
+
+        $entityManager = $this->getEntityManager();
+        $aiLogRepository = $entityManager->getRepository(AiLog::class);
+        $logs = $aiLogRepository->findBy(['actionName' => 'generateBatchPlayerTraitsSummaryDescriptions']);
+
+        self::assertCount(1, $logs);
+
+        $aiLog = $logs[0];
+        self::assertSame(AiLogStatus::Success, $aiLog->getStatus());
+        self::assertSame('generateBatchPlayerTraitsSummaryDescriptions', $aiLog->getActionName());
+    }
+
+    public function testGenerateBatchPlayerTraitsSummaryDescriptionsOnErrorPersistsErrorLog(): void
+    {
+        $this->setUpMockGeminiClientWithError();
+
+        $playerTraitStrengths = [
+            ['leadership' => '0.85', 'empathy' => '0.60'],
+        ];
+
+        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
+
+        try {
+            $aiPlayerFacade->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths);
+            self::fail('Expected AiRequestFailedException to be thrown');
+        } catch (AiRequestFailedException $exception) {
+            self::assertSame('generateBatchPlayerTraitsSummaryDescriptions', $exception->getActionName());
+        }
+
+        $entityManager = $this->getEntityManager();
+        $aiLogRepository = $entityManager->getRepository(AiLog::class);
+        $logs = $aiLogRepository->findBy(['actionName' => 'generateBatchPlayerTraitsSummaryDescriptions']);
+
+        self::assertCount(1, $logs);
+
+        $aiLog = $logs[0];
+        self::assertSame(AiLogStatus::Error, $aiLog->getStatus());
+        self::assertNotNull($aiLog->getErrorMessage());
+    }
+
     private function setUpMockGeminiClient(): void
     {
         $mockClient = new class implements GeminiClient {
@@ -160,9 +226,28 @@ final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
             public function request(AiRequest $aiRequest): AiResponse
             {
                 return new AiResponse(
-                    '{"summary": "Summary from traits."}',
+                    '{"summaries": [{"player_index": 1, "summary": "Summary from traits."}]}',
                     new TokenUsage(50, 25, 75),
                     150,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+        };
+
+        self::getContainer()->set(GeminiClient::class, $mockClient);
+    }
+
+    private function setUpMockGeminiClientForBatchSummary(): void
+    {
+        $mockClient = new class implements GeminiClient {
+            public function request(AiRequest $aiRequest): AiResponse
+            {
+                return new AiResponse(
+                    '{"summaries": [{"player_index": 1, "summary": "Leader summary."}, {"player_index": 2, "summary": "Empath summary."}]}',
+                    new TokenUsage(80, 40, 120),
+                    200,
                     'gemini-2.5-flash',
                     '{"candidates": []}',
                     'STOP',

@@ -140,7 +140,7 @@ final class PlayerControllerTest extends AbstractFunctionalTestCase
             public function request(AiRequest $aiRequest): AiResponse
             {
                 return new AiResponse(
-                    '{"summary": "Summary from traits."}',
+                    '{"summaries": [{"player_index": 1, "summary": "Summary from traits."}]}',
                     new TokenUsage(50, 25, 75),
                     150,
                     'gemini-2.5-flash',

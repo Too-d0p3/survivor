@@ -191,6 +191,176 @@ final class AiResponseParserTest extends TestCase
         $this->parser->parseGenerateSummaryResponse($content, 'test-action');
     }
 
+    public function testParseGenerateBatchSummaryResponseValidJson(): void
+    {
+        $content = json_encode([
+            'summaries' => [
+                ['player_index' => 1, 'summary' => 'Strong leader.'],
+                ['player_index' => 2, 'summary' => 'Empathetic player.'],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->parser->parseGenerateBatchSummaryResponse($content, 2, 'test-action');
+
+        self::assertSame(['Strong leader.', 'Empathetic player.'], $result->getSummaries());
+    }
+
+    public function testParseGenerateBatchSummaryResponseSinglePlayer(): void
+    {
+        $content = json_encode([
+            'summaries' => [
+                ['player_index' => 1, 'summary' => 'Solo player.'],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->parser->parseGenerateBatchSummaryResponse($content, 1, 'test-action');
+
+        self::assertSame(['Solo player.'], $result->getSummaries());
+    }
+
+    public function testParseGenerateBatchSummaryResponseReordersByPlayerIndex(): void
+    {
+        $content = json_encode([
+            'summaries' => [
+                ['player_index' => 2, 'summary' => 'Second player.'],
+                ['player_index' => 1, 'summary' => 'First player.'],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->parser->parseGenerateBatchSummaryResponse($content, 2, 'test-action');
+
+        self::assertSame(['First player.', 'Second player.'], $result->getSummaries());
+    }
+
+    public function testParseGenerateBatchSummaryResponseInvalidJsonThrowsException(): void
+    {
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('Invalid JSON');
+
+        $this->parser->parseGenerateBatchSummaryResponse('not valid json{', 2, 'test-action');
+    }
+
+    public function testParseGenerateBatchSummaryResponseMissingSummariesKeyThrowsException(): void
+    {
+        $content = json_encode(['other' => 'value'], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('Missing "summaries" key in response');
+
+        $this->parser->parseGenerateBatchSummaryResponse($content, 2, 'test-action');
+    }
+
+    public function testParseGenerateBatchSummaryResponseSummariesNotArrayThrowsException(): void
+    {
+        $content = json_encode(['summaries' => 'not-array'], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('"summaries" value is not an array');
+
+        $this->parser->parseGenerateBatchSummaryResponse($content, 2, 'test-action');
+    }
+
+    public function testParseGenerateBatchSummaryResponseWrongCountThrowsException(): void
+    {
+        $content = json_encode([
+            'summaries' => [
+                ['player_index' => 1, 'summary' => 'Only one.'],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('Expected 2 summaries, got 1');
+
+        $this->parser->parseGenerateBatchSummaryResponse($content, 2, 'test-action');
+    }
+
+    public function testParseGenerateBatchSummaryResponseMissingPlayerIndexThrowsException(): void
+    {
+        $content = json_encode([
+            'summaries' => [
+                ['summary' => 'No index.'],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('Missing or invalid player_index at index 0');
+
+        $this->parser->parseGenerateBatchSummaryResponse($content, 1, 'test-action');
+    }
+
+    public function testParseGenerateBatchSummaryResponseDuplicatePlayerIndexThrowsException(): void
+    {
+        $content = json_encode([
+            'summaries' => [
+                ['player_index' => 1, 'summary' => 'First.'],
+                ['player_index' => 1, 'summary' => 'Duplicate.'],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('Duplicate player_index 1');
+
+        $this->parser->parseGenerateBatchSummaryResponse($content, 2, 'test-action');
+    }
+
+    public function testParseGenerateBatchSummaryResponseSummaryNotStringThrowsException(): void
+    {
+        $content = json_encode([
+            'summaries' => [
+                ['player_index' => 1, 'summary' => 123],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('"summary" value at index 0 is not a string');
+
+        $this->parser->parseGenerateBatchSummaryResponse($content, 1, 'test-action');
+    }
+
+    public function testParseGenerateBatchSummaryResponseSummaryExceedsLengthLimitThrowsException(): void
+    {
+        $longSummary = str_repeat('a', 201);
+        $content = json_encode([
+            'summaries' => [
+                ['player_index' => 1, 'summary' => $longSummary],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('Summary at index 0 exceeds 200 character limit');
+
+        $this->parser->parseGenerateBatchSummaryResponse($content, 1, 'test-action');
+    }
+
+    public function testParseGenerateBatchSummaryResponsePlayerIndexBelowMinimumThrowsException(): void
+    {
+        $content = json_encode([
+            'summaries' => [
+                ['player_index' => 0, 'summary' => 'Invalid index.'],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('player_index 0 out of range');
+
+        $this->parser->parseGenerateBatchSummaryResponse($content, 1, 'test-action');
+    }
+
+    public function testParseGenerateBatchSummaryResponsePlayerIndexAboveMaximumThrowsException(): void
+    {
+        $content = json_encode([
+            'summaries' => [
+                ['player_index' => 1, 'summary' => 'Valid.'],
+                ['player_index' => 3, 'summary' => 'Index too high.'],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('player_index 3 out of range');
+
+        $this->parser->parseGenerateBatchSummaryResponse($content, 2, 'test-action');
+    }
+
     protected function setUp(): void
     {
         $this->parser = new AiResponseParser();
