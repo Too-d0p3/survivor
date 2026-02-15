@@ -23,13 +23,14 @@ final class AiResponseParserTest extends TestCase
             'traits' => [
                 'leadership' => 0.8,
                 'charisma' => 0.6,
+                'endurance' => 0.7,
             ],
             'summary' => 'Strong leader with good social skills',
         ], JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parseGenerateTraitsResponse($content, $this->availableTraits, 'test-action');
 
-        self::assertSame(['leadership' => 0.8, 'charisma' => 0.6], $result->getTraitScores());
+        self::assertSame(['leadership' => 0.8, 'charisma' => 0.6, 'endurance' => 0.7], $result->getTraitScores());
         self::assertSame('Strong leader with good social skills', $result->getSummary());
     }
 
@@ -114,19 +115,35 @@ final class AiResponseParserTest extends TestCase
         $this->parser->parseGenerateTraitsResponse($content, $this->availableTraits, 'test-action');
     }
 
+    public function testParseGenerateTraitsResponseMissingTraitKeysThrowsException(): void
+    {
+        $content = json_encode([
+            'traits' => [
+                'leadership' => 0.8,
+            ],
+            'summary' => 'Summary',
+        ], JSON_THROW_ON_ERROR);
+
+        $this->expectException(AiResponseParsingFailedException::class);
+        $this->expectExceptionMessage('Missing trait keys in response: charisma, endurance');
+
+        $this->parser->parseGenerateTraitsResponse($content, $this->availableTraits, 'test-action');
+    }
+
     public function testParseGenerateTraitsResponseAcceptsIntegerScores(): void
     {
         $content = json_encode([
             'traits' => [
                 'leadership' => 1,
                 'charisma' => 0,
+                'endurance' => 1,
             ],
             'summary' => 'Test with integer scores',
         ], JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parseGenerateTraitsResponse($content, $this->availableTraits, 'test-action');
 
-        self::assertSame(['leadership' => 1.0, 'charisma' => 0.0], $result->getTraitScores());
+        self::assertSame(['leadership' => 1.0, 'charisma' => 0.0, 'endurance' => 1.0], $result->getTraitScores());
     }
 
     public function testParseGenerateSummaryResponseValidJson(): void

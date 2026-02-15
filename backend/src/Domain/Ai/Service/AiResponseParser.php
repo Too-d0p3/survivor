@@ -104,6 +104,15 @@ final class AiResponseParser
             $traitScores[$traitKey] = $scoreFloat;
         }
 
+        $missingTraits = array_diff($availableTraitKeys, array_keys($traitScores));
+        if ($missingTraits !== []) {
+            throw new AiResponseParsingFailedException(
+                $actionName,
+                $content,
+                sprintf('Missing trait keys in response: %s', implode(', ', $missingTraits)),
+            );
+        }
+
         return new GenerateTraitsResult($traitScores, $data['summary']);
     }
 
