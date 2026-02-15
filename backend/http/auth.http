@@ -1,0 +1,25 @@
+### Login (saves token for other requests)
+POST {{base_url}}/api/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.global.set("auth_token", response.body.token);
+%}
+
+### Register new user
+POST {{base_url}}/api/register
+Content-Type: application/json
+
+{
+  "email": "test@test.cz",
+  "password": "test1234"
+}
+
+### Get current user
+GET {{base_url}}/api/user/me
+Authorization: Bearer {{auth_token}}

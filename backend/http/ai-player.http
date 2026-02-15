@@ -1,0 +1,22 @@
+### Generate player traits from description (calls Gemini)
+POST {{base_url}}/api/game/player/traits/generate
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "description": "Chytrý stratég, který dokáže manipulovat s ostatními. Je charismatický, ale sobecký. Pod tlakem zůstává klidný a vždy má plán B."
+}
+
+### Generate summary description from trait strengths (calls Gemini)
+POST {{base_url}}/api/game/player/traits/generate-summary-description
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "strategic_thinking": "0.9",
+  "manipulation": "0.8",
+  "charisma": "0.7",
+  "empathy": "0.3",
+  "physical_endurance": "0.5",
+  "emotional_control": "0.85"
+}

@@ -1,0 +1,3 @@
+### Create a new game
+POST {{base_url}}/api/game/create
+Authorization: Bearer {{auth_token}}
