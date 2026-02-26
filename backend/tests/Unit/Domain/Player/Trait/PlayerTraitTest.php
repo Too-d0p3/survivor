@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Domain\Player\Trait;
 
 use App\Domain\Game\Game;
+use App\Domain\Game\GameStatus;
 use App\Domain\Player\Player;
 use App\Domain\Player\Trait\PlayerTrait;
 use App\Domain\TraitDef\TraitDef;
@@ -18,8 +19,8 @@ final class PlayerTraitTest extends TestCase
     public function testConstructorSetsAllProperties(): void
     {
         $user = new User('owner@example.com');
-        $game = new Game($user, false, new DateTimeImmutable());
-        $player = new Player('Alice', false, $game);
+        $game = new Game($user, GameStatus::Setup, new DateTimeImmutable());
+        $player = new Player('Alice', $game);
         $traitDef = new TraitDef('charisma', 'Charisma', 'Social charm', TraitType::Social);
 
         $playerTrait = new PlayerTrait($player, $traitDef, '0.85');
@@ -33,9 +34,9 @@ final class PlayerTraitTest extends TestCase
     public function testSetPlayerChangesPlayer(): void
     {
         $user = new User('owner@example.com');
-        $game = new Game($user, false, new DateTimeImmutable());
-        $player1 = new Player('Alice', false, $game);
-        $player2 = new Player('Bob', false, $game);
+        $game = new Game($user, GameStatus::Setup, new DateTimeImmutable());
+        $player1 = new Player('Alice', $game);
+        $player2 = new Player('Bob', $game);
         $traitDef = new TraitDef('charisma', 'Charisma', 'Social charm', TraitType::Social);
         $playerTrait = new PlayerTrait($player1, $traitDef, '0.50');
 

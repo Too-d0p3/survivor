@@ -15,8 +15,5 @@ parameters:
         - src/
         - tests/
     reportUnmatchedIgnoredErrors: true
-    ignoreErrors:
-        -
-            identifier: doctrine.finalEntity
     symfony:
         containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml

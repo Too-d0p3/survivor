@@ -6,6 +6,7 @@ namespace App\Domain\Player;
 
 use App\Domain\Game\Game;
 use App\Domain\Player\Trait\PlayerTrait;
+use App\Domain\User\User;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
@@ -22,9 +23,6 @@ final class Player
     #[ORM\Column(length: 255)]
     private string $name;
 
-    #[ORM\Column]
-    private bool $isUserControlled;
-
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
@@ -32,16 +30,20 @@ final class Player
     #[ORM\JoinColumn(nullable: false)]
     private Game $game;
 
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?User $user;
+
     /** @var Collection<int, PlayerTrait> */
     #[ORM\OneToMany(mappedBy: 'player', targetEntity: PlayerTrait::class, orphanRemoval: true)]
     private Collection $playerTraits;
 
-    public function __construct(string $name, bool $isUserControlled, Game $game)
+    public function __construct(string $name, Game $game, ?User $user = null)
     {
         $this->id = Uuid::v7();
         $this->name = $name;
-        $this->isUserControlled = $isUserControlled;
         $this->game = $game;
+        $this->user = $user;
         $this->playerTraits = new ArrayCollection();
     }
 
@@ -70,14 +72,24 @@ final class Player
         return $this->name;
     }
 
-    public function isUserControlled(): bool
+    public function isHuman(): bool
     {
-        return $this->isUserControlled;
+        return $this->user !== null;
+    }
+
+    public function getUser(): ?User
+    {
+        return $this->user;
     }
 
     public function getDescription(): ?string
     {
         return $this->description;
+    }
+
+    public function setDescription(string $description): void
+    {
+        $this->description = $description;
     }
 
     public function getGame(): Game

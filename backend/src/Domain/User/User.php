@@ -57,7 +57,6 @@ final class User implements UserInterface, PasswordAuthenticatedUserInterface
         }
 
         $this->games->add($game);
-        $game->setOwner($this);
     }
 
     public function removeGame(Game $game): void

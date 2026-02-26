@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Ai\Service;
+namespace App\Domain\Player;
 
 use App\Domain\Ai\AiExecutor;
 use App\Domain\Ai\Operation\GenerateBatchPlayerSummariesOperation;
@@ -14,7 +14,7 @@ use App\Domain\Ai\Result\GenerateSummaryResult;
 use App\Domain\TraitDef\TraitDef;
 use DateTimeImmutable;
 
-final readonly class AiPlayerService
+final readonly class PlayerService
 {
     private AiExecutor $executor;
 
@@ -69,5 +69,20 @@ final readonly class AiPlayerService
         }
 
         return GenerateBatchPlayerSummariesServiceResult::success($callResult->getResult(), [$callResult->getLog()]);
+    }
+
+    /**
+     * @param array<int, TraitDef> $traitDefs
+     * @return array<string, string>
+     */
+    public function generateRandomTraitStrengths(array $traitDefs): array
+    {
+        $strengths = [];
+
+        foreach ($traitDefs as $traitDef) {
+            $strengths[$traitDef->getKey()] = number_format(random_int(0, 100) / 100, 2, '.', '');
+        }
+
+        return $strengths;
     }
 }

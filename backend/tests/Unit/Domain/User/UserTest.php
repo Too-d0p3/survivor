@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Domain\User;
 
 use App\Domain\Game\Game;
+use App\Domain\Game\GameStatus;
 use App\Domain\User\User;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
@@ -37,22 +38,21 @@ final class UserTest extends TestCase
         self::assertSame('hashed_password', $user->getPassword());
     }
 
-    public function testAddGameAddsGameToCollectionAndSetsOwner(): void
+    public function testAddGameAddsGameToCollection(): void
     {
         $user = new User('test@example.com');
-        $game = new Game($user, false, new DateTimeImmutable());
+        $game = new Game($user, GameStatus::Setup, new DateTimeImmutable());
 
         $user->addGame($game);
 
         self::assertCount(1, $user->getGames());
         self::assertSame($game, $user->getGames()[0]);
-        self::assertSame($user, $game->getOwner());
     }
 
     public function testRemoveGameRemovesFromCollection(): void
     {
         $user = new User('test@example.com');
-        $game = new Game($user, false, new DateTimeImmutable());
+        $game = new Game($user, GameStatus::Setup, new DateTimeImmutable());
         $user->addGame($game);
 
         $user->removeGame($game);

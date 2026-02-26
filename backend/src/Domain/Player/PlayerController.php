@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domain\Player;
 
-use App\Domain\Ai\AiPlayerFacade;
 use App\Domain\TraitDef\TraitDefRepository;
 use App\Domain\User\User;
 use App\Dto\Game\Player\GenerateTraitsInput;
@@ -18,15 +17,15 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class PlayerController extends AbstractApiController
 {
-    private readonly AiPlayerFacade $aiPlayerFacade;
+    private readonly PlayerFacade $playerFacade;
 
     private readonly TraitDefRepository $traitDefRepository;
 
     public function __construct(
-        AiPlayerFacade $aiPlayerFacade,
+        PlayerFacade $playerFacade,
         TraitDefRepository $traitDefRepository,
     ) {
-        $this->aiPlayerFacade = $aiPlayerFacade;
+        $this->playerFacade = $playerFacade;
         $this->traitDefRepository = $traitDefRepository;
     }
 
@@ -50,7 +49,7 @@ final class PlayerController extends AbstractApiController
         assert($validationResult->dto instanceof GenerateTraitsInput);
 
         $traits = array_values($this->traitDefRepository->findAll());
-        $result = $this->aiPlayerFacade->generatePlayerTraitsFromDescription($validationResult->dto->description, $traits);
+        $result = $this->playerFacade->generatePlayerTraitsFromDescription($validationResult->dto->description, $traits);
 
         return $this->json([
             'traits' => $result->getTraitScores(),
@@ -74,7 +73,7 @@ final class PlayerController extends AbstractApiController
         /** @var array<string, string> $traitStrengths */
         $traitStrengths = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
-        $result = $this->aiPlayerFacade->generatePlayerTraitsSummaryDescription($traitStrengths);
+        $result = $this->playerFacade->generatePlayerTraitsSummaryDescription($traitStrengths);
 
         return $this->json([
             'summary' => $result->getSummary(),

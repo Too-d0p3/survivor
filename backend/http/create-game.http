@@ -1,0 +1,81 @@
+##########################################################
+# Kompletni flow pro vytvoreni hry s 1 lidskym + 5 AI hraci
+#
+# Pouziti:
+#   1. Uprav konstanty nize (jmeno, popis, traity)
+#   2. Spust "Login" request (nebo pouzij token z auth.http)
+#   3. Spust "Step 1: Generate traits" — AI vygeneruje traity z popisu
+#   4. Zkontroluj/uprav traity ve Step 2
+#   5. Spust "Step 2: Create game" — vytvori hru se 6 hraci
+#
+# Alternativne: rovnou spust Step 2 s vlastnimi trait hodnotami
+##########################################################
+
+### Login (saves token)
+POST {{base_url}}/api/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.global.set("auth_token", response.body.token);
+%}
+
+###
+
+### Step 1: Generate traits from player description (calls Gemini AI)
+# AI analyzuje popis a vrati trait hodnoty + summary
+POST {{base_url}}/api/game/player/traits/generate
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "description": "Chytrý stratég, který dokáže manipulovat s ostatními. Je charismatický, ale sobecký. Pod tlakem zůstává klidný a vždy má plán B. Má přirozenou autoritu, ale občas podceňuje emoce druhých."
+}
+
+> {%
+    // Ulozi vygenerovane traity pro pouziti v Step 2
+    client.global.set("generated_traits", JSON.stringify(response.body.traits));
+    client.global.set("generated_summary", response.body.summary);
+%}
+
+###
+
+### Step 2: Create game
+# Vytvori hru: 1 lidsky hrac (tvuj) + 5 AI hracu s random traity
+#
+# Muzes pouzit AI-vygenerovane traity ze Step 1,
+# nebo zadat vlastni hodnoty (0.00 - 1.00)
+POST {{base_url}}/api/game/create
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "playerName": "Ondra",
+  "playerDescription": "Chytrý stratég s přirozenou autoritou, který pod tlakem zůstává klidný.",
+  "traitStrengths": {
+    "loyal": "0.50",
+    "treacherous": "0.30",
+    "manipulative": "0.80",
+    "leader": "0.75",
+    "introverted": "0.40",
+    "naive": "0.15",
+    "strategic": "0.90",
+    "emotionally_unstable": "0.20",
+    "paranoid": "0.35",
+    "witty": "0.65"
+  }
+}
+
+> {%
+    client.global.set("game_id", response.body.id);
+    client.log("Game created: " + response.body.id);
+    client.log("Players: " + response.body.players.length);
+    for (var i = 0; i < response.body.players.length; i++) {
+        var p = response.body.players[i];
+        client.log((p.isHuman ? "[HUMAN]" : "[AI]   ") + " " + p.name + " — " + p.description);
+    }
+%}

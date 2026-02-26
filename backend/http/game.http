@@ -1,3 +1,22 @@
-### Create a new game
+### Create a new game (full flow with AI players — see create-game.http)
+# Pro kompletni flow s konfiguraci hrace pouzij create-game.http
 POST {{base_url}}/api/game/create
 Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "playerName": "Ondra",
+  "playerDescription": "Testovaci hrac",
+  "traitStrengths": {
+    "loyal": "0.50",
+    "treacherous": "0.30",
+    "manipulative": "0.50",
+    "leader": "0.50",
+    "introverted": "0.50",
+    "naive": "0.50",
+    "strategic": "0.50",
+    "emotionally_unstable": "0.50",
+    "paranoid": "0.50",
+    "witty": "0.50"
+  }
+}

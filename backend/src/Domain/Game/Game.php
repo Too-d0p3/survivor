@@ -23,8 +23,8 @@ final class Game
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private DateTimeImmutable $createdAt;
 
-    #[ORM\Column]
-    private bool $isSandbox;
+    #[ORM\Column(type: Types::STRING, length: 20, enumType: GameStatus::class)]
+    private GameStatus $status;
 
     /** @var Collection<int, Player> */
     #[ORM\OneToMany(mappedBy: 'game', targetEntity: Player::class, orphanRemoval: true)]
@@ -34,11 +34,11 @@ final class Game
     #[ORM\JoinColumn(nullable: false)]
     private User $owner;
 
-    public function __construct(User $owner, bool $isSandbox, DateTimeImmutable $createdAt)
+    public function __construct(User $owner, GameStatus $status, DateTimeImmutable $createdAt)
     {
         $this->id = Uuid::v7();
         $this->owner = $owner;
-        $this->isSandbox = $isSandbox;
+        $this->status = $status;
         $this->createdAt = $createdAt;
         $this->players = new ArrayCollection();
     }
@@ -68,9 +68,9 @@ final class Game
         return $this->createdAt;
     }
 
-    public function isSandbox(): bool
+    public function getStatus(): GameStatus
     {
-        return $this->isSandbox;
+        return $this->status;
     }
 
     /**
@@ -84,10 +84,5 @@ final class Game
     public function getOwner(): User
     {
         return $this->owner;
-    }
-
-    public function setOwner(User $owner): void
-    {
-        $this->owner = $owner;
     }
 }

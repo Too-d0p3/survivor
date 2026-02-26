@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Integration\Domain\Ai;
+namespace App\Tests\Integration\Domain\Player;
 
-use App\Domain\Ai\AiPlayerFacade;
 use App\Domain\Ai\Client\GeminiClient;
 use App\Domain\Ai\Dto\AiRequest;
 use App\Domain\Ai\Exceptions\AiRequestFailedException;
@@ -12,11 +11,12 @@ use App\Domain\Ai\Log\AiLog;
 use App\Domain\Ai\Log\AiLogStatus;
 use App\Domain\Ai\Result\AiResponse;
 use App\Domain\Ai\Result\TokenUsage;
+use App\Domain\Player\PlayerFacade;
 use App\Domain\TraitDef\TraitDef;
 use App\Domain\TraitDef\TraitType;
 use App\Tests\Integration\AbstractIntegrationTestCase;
 
-final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
+final class PlayerFacadeTest extends AbstractIntegrationTestCase
 {
     public function testGeneratePlayerTraitsFromDescriptionReturnsGenerateTraitsResult(): void
     {
@@ -32,8 +32,8 @@ final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
 
         $traits = [$leadership, $empathy];
 
-        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
-        $result = $aiPlayerFacade->generatePlayerTraitsFromDescription('A strong leader with empathy', $traits);
+        $playerFacade = $this->getService(PlayerFacade::class);
+        $result = $playerFacade->generatePlayerTraitsFromDescription('A strong leader with empathy', $traits);
 
         self::assertSame(['leadership' => 0.85, 'empathy' => 0.6], $result->getTraitScores());
         self::assertSame('Test summary.', $result->getSummary());
@@ -53,8 +53,8 @@ final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
 
         $traits = [$leadership, $empathy];
 
-        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
-        $aiPlayerFacade->generatePlayerTraitsFromDescription('A strong leader', $traits);
+        $playerFacade = $this->getService(PlayerFacade::class);
+        $playerFacade->generatePlayerTraitsFromDescription('A strong leader', $traits);
 
         $aiLogRepository = $entityManager->getRepository(AiLog::class);
         $logs = $aiLogRepository->findBy(['actionName' => 'generatePlayerTraitsFromDescription']);
@@ -84,10 +84,10 @@ final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
 
         $traits = [$leadership, $empathy];
 
-        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
+        $playerFacade = $this->getService(PlayerFacade::class);
 
         try {
-            $aiPlayerFacade->generatePlayerTraitsFromDescription('A strong leader', $traits);
+            $playerFacade->generatePlayerTraitsFromDescription('A strong leader', $traits);
             self::fail('Expected AiRequestFailedException to be thrown');
         } catch (AiRequestFailedException $exception) {
             self::assertSame('generatePlayerTraitsFromDescription', $exception->getActionName());
@@ -113,8 +113,8 @@ final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
             'empathy' => '0.6',
         ];
 
-        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
-        $result = $aiPlayerFacade->generatePlayerTraitsSummaryDescription($traitStrengths);
+        $playerFacade = $this->getService(PlayerFacade::class);
+        $result = $playerFacade->generatePlayerTraitsSummaryDescription($traitStrengths);
 
         self::assertSame('Summary from traits.', $result->getSummary());
     }
@@ -128,8 +128,8 @@ final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
             ['leadership' => '0.30', 'empathy' => '0.90'],
         ];
 
-        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
-        $result = $aiPlayerFacade->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths);
+        $playerFacade = $this->getService(PlayerFacade::class);
+        $result = $playerFacade->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths);
 
         self::assertSame(['Leader summary.', 'Empath summary.'], $result->getSummaries());
     }
@@ -143,8 +143,8 @@ final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
             ['leadership' => '0.30', 'empathy' => '0.90'],
         ];
 
-        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
-        $aiPlayerFacade->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths);
+        $playerFacade = $this->getService(PlayerFacade::class);
+        $playerFacade->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths);
 
         $entityManager = $this->getEntityManager();
         $aiLogRepository = $entityManager->getRepository(AiLog::class);
@@ -165,10 +165,10 @@ final class AiPlayerFacadeTest extends AbstractIntegrationTestCase
             ['leadership' => '0.85', 'empathy' => '0.60'],
         ];
 
-        $aiPlayerFacade = $this->getService(AiPlayerFacade::class);
+        $playerFacade = $this->getService(PlayerFacade::class);
 
         try {
-            $aiPlayerFacade->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths);
+            $playerFacade->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths);
             self::fail('Expected AiRequestFailedException to be thrown');
         } catch (AiRequestFailedException $exception) {
             self::assertSame('generateBatchPlayerTraitsSummaryDescriptions', $exception->getActionName());

@@ -2,29 +2,28 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Ai;
+namespace App\Domain\Player;
 
 use App\Domain\Ai\Log\AiLog;
 use App\Domain\Ai\Result\GenerateBatchSummaryResult;
 use App\Domain\Ai\Result\GenerateSummaryResult;
 use App\Domain\Ai\Result\GenerateTraitsResult;
-use App\Domain\Ai\Service\AiPlayerService;
 use App\Domain\TraitDef\TraitDef;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 
-final class AiPlayerFacade
+final class PlayerFacade
 {
     private readonly EntityManagerInterface $entityManager;
 
-    private readonly AiPlayerService $aiPlayerService;
+    private readonly PlayerService $playerService;
 
     public function __construct(
         EntityManagerInterface $entityManager,
-        AiPlayerService $aiPlayerService,
+        PlayerService $playerService,
     ) {
         $this->entityManager = $entityManager;
-        $this->aiPlayerService = $aiPlayerService;
+        $this->playerService = $playerService;
     }
 
     /**
@@ -33,7 +32,7 @@ final class AiPlayerFacade
     public function generatePlayerTraitsFromDescription(string $description, array $traits): GenerateTraitsResult
     {
         $now = new DateTimeImmutable();
-        $serviceResult = $this->aiPlayerService->generatePlayerTraitsFromDescription($description, $traits, $now);
+        $serviceResult = $this->playerService->generatePlayerTraitsFromDescription($description, $traits, $now);
         $this->persistLogs($serviceResult->getLogs());
 
         if (!$serviceResult->isSuccess()) {
@@ -49,7 +48,7 @@ final class AiPlayerFacade
     public function generatePlayerTraitsSummaryDescription(array $traitStrengths): GenerateSummaryResult
     {
         $now = new DateTimeImmutable();
-        $serviceResult = $this->aiPlayerService->generatePlayerTraitsSummaryDescription($traitStrengths, $now);
+        $serviceResult = $this->playerService->generatePlayerTraitsSummaryDescription($traitStrengths, $now);
         $this->persistLogs($serviceResult->getLogs());
 
         if (!$serviceResult->isSuccess()) {
@@ -65,7 +64,7 @@ final class AiPlayerFacade
     public function generateBatchPlayerTraitsSummaryDescriptions(array $playerTraitStrengths): GenerateBatchSummaryResult
     {
         $now = new DateTimeImmutable();
-        $serviceResult = $this->aiPlayerService->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths, $now);
+        $serviceResult = $this->playerService->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths, $now);
         $this->persistLogs($serviceResult->getLogs());
 
         if (!$serviceResult->isSuccess()) {

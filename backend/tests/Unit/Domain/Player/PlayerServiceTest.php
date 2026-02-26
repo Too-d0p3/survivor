@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Domain\Ai\Service;
+namespace App\Tests\Unit\Domain\Player;
 
 use App\Domain\Ai\AiExecutor;
 use App\Domain\Ai\Exceptions\AiRequestFailedException;
@@ -11,21 +11,21 @@ use App\Domain\Ai\Operation\AiOperation;
 use App\Domain\Ai\Result\AiCallResult;
 use App\Domain\Ai\Result\GenerateBatchSummaryResult;
 use App\Domain\Ai\Result\GenerateTraitsResult;
-use App\Domain\Ai\Service\AiPlayerService;
+use App\Domain\Player\PlayerService;
 use App\Domain\TraitDef\TraitDef;
 use App\Domain\TraitDef\TraitType;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Throwable;
 
-final class AiPlayerServiceTest extends TestCase
+final class PlayerServiceTest extends TestCase
 {
     public function testGeneratePlayerTraitsFromDescriptionReturnsSuccessResult(): void
     {
         $traitsResult = new GenerateTraitsResult(['leadership' => 0.8], 'A leader');
         $log = $this->createAiLog();
         $executor = $this->createSuccessExecutor($traitsResult, $log);
-        $service = new AiPlayerService($executor);
+        $service = new PlayerService($executor);
         $now = new DateTimeImmutable('2026-01-15 12:00:00');
 
         $traits = [new TraitDef('leadership', 'Leadership', 'Leading', TraitType::Social)];
@@ -43,7 +43,7 @@ final class AiPlayerServiceTest extends TestCase
         $log = $this->createAiLog();
         $error = new AiRequestFailedException('test', 500, 'Failed');
         $executor = $this->createFailureExecutor($log, $error);
-        $service = new AiPlayerService($executor);
+        $service = new PlayerService($executor);
         $now = new DateTimeImmutable('2026-01-15 12:00:00');
 
         $traits = [new TraitDef('leadership', 'Leadership', 'Leading', TraitType::Social)];
@@ -60,7 +60,7 @@ final class AiPlayerServiceTest extends TestCase
         $batchResult = new GenerateBatchSummaryResult(['Summary from traits.']);
         $log = $this->createAiLog();
         $executor = $this->createSuccessExecutor($batchResult, $log);
-        $service = new AiPlayerService($executor);
+        $service = new PlayerService($executor);
         $now = new DateTimeImmutable('2026-01-15 12:00:00');
 
         $result = $service->generatePlayerTraitsSummaryDescription(['leadership' => '0.85'], $now);
@@ -75,7 +75,7 @@ final class AiPlayerServiceTest extends TestCase
         $log = $this->createAiLog();
         $error = new AiRequestFailedException('test', 500, 'Failed');
         $executor = $this->createFailureExecutor($log, $error);
-        $service = new AiPlayerService($executor);
+        $service = new PlayerService($executor);
         $now = new DateTimeImmutable('2026-01-15 12:00:00');
 
         $result = $service->generatePlayerTraitsSummaryDescription(['leadership' => '0.85'], $now);
@@ -89,7 +89,7 @@ final class AiPlayerServiceTest extends TestCase
         $batchResult = new GenerateBatchSummaryResult(['Leader summary.', 'Empath summary.']);
         $log = $this->createAiLog();
         $executor = $this->createSuccessExecutor($batchResult, $log);
-        $service = new AiPlayerService($executor);
+        $service = new PlayerService($executor);
         $now = new DateTimeImmutable('2026-01-15 12:00:00');
 
         $playerTraitStrengths = [
@@ -109,7 +109,7 @@ final class AiPlayerServiceTest extends TestCase
         $log = $this->createAiLog();
         $error = new AiRequestFailedException('test', 500, 'Failed');
         $executor = $this->createFailureExecutor($log, $error);
-        $service = new AiPlayerService($executor);
+        $service = new PlayerService($executor);
         $now = new DateTimeImmutable('2026-01-15 12:00:00');
 
         $playerTraitStrengths = [['leadership' => '0.85']];
@@ -119,6 +119,55 @@ final class AiPlayerServiceTest extends TestCase
         self::assertFalse($result->isSuccess());
         self::assertSame($error, $result->getError());
         self::assertCount(1, $result->getLogs());
+    }
+
+    public function testGenerateRandomTraitStrengthsReturnsAllTraitKeys(): void
+    {
+        $service = new PlayerService($this->createDummyExecutor());
+
+        $traitDefs = [
+            new TraitDef('leadership', 'Leadership', 'Leading', TraitType::Social),
+            new TraitDef('empathy', 'Empathy', 'Understanding', TraitType::Emotional),
+        ];
+
+        $result = $service->generateRandomTraitStrengths($traitDefs);
+
+        self::assertCount(2, $result);
+        self::assertArrayHasKey('leadership', $result);
+        self::assertArrayHasKey('empathy', $result);
+    }
+
+    public function testGenerateRandomTraitStrengthsReturnsValuesInRange(): void
+    {
+        $service = new PlayerService($this->createDummyExecutor());
+
+        $traitDefs = [
+            new TraitDef('leadership', 'Leadership', 'Leading', TraitType::Social),
+            new TraitDef('empathy', 'Empathy', 'Understanding', TraitType::Emotional),
+        ];
+
+        $result = $service->generateRandomTraitStrengths($traitDefs);
+
+        foreach ($result as $value) {
+            $numericValue = (float) $value;
+            self::assertGreaterThanOrEqual(0.0, $numericValue);
+            self::assertLessThanOrEqual(1.0, $numericValue);
+            self::assertMatchesRegularExpression('/^\d\.\d{2}$/', $value);
+        }
+    }
+
+    public function testGenerateRandomTraitStrengthsWithEmptyArrayReturnsEmpty(): void
+    {
+        $service = new PlayerService($this->createDummyExecutor());
+
+        $result = $service->generateRandomTraitStrengths([]);
+
+        self::assertSame([], $result);
+    }
+
+    private function createDummyExecutor(): AiExecutor
+    {
+        return $this->createSuccessExecutor(null, $this->createAiLog());
     }
 
     private function createSuccessExecutor(mixed $parsedResult, AiLog $log): AiExecutor
