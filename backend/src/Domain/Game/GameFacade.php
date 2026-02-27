@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domain\Game;
 
+use App\Domain\Ai\Operation\PlayerRelationshipInput;
 use App\Domain\Game\Result\CreateGameResult;
+use App\Domain\Player\Player;
 use App\Domain\Player\PlayerService;
+use App\Domain\Relationship\RelationshipService;
 use App\Domain\TraitDef\TraitDefRepository;
 use App\Domain\User\User;
 use DateTimeImmutable;
@@ -19,17 +22,21 @@ final class GameFacade
 
     private readonly PlayerService $playerService;
 
+    private readonly RelationshipService $relationshipService;
+
     private readonly TraitDefRepository $traitDefRepository;
 
     public function __construct(
         EntityManagerInterface $entityManager,
         GameService $gameService,
         PlayerService $playerService,
+        RelationshipService $relationshipService,
         TraitDefRepository $traitDefRepository,
     ) {
         $this->entityManager = $entityManager;
         $this->gameService = $gameService;
         $this->playerService = $playerService;
+        $this->relationshipService = $relationshipService;
         $this->traitDefRepository = $traitDefRepository;
     }
 
@@ -87,8 +94,56 @@ final class GameFacade
             }
         }
 
+        $playerDataList = $this->buildPlayerRelationshipData($game->getPlayers());
+        $relationshipServiceResult = $this->playerService->initializeRelationships($playerDataList, $now);
+
+        foreach ($relationshipServiceResult->getLogs() as $log) {
+            $this->entityManager->persist($log);
+        }
+
+        if (!$relationshipServiceResult->isSuccess()) {
+            $this->entityManager->flush();
+
+            throw $relationshipServiceResult->getError();
+        }
+
+        $relationships = $this->relationshipService->initializeRelationships(
+            $game->getPlayers(),
+            $relationshipServiceResult->getResult(),
+            $now,
+        );
+
+        foreach ($relationships as $relationship) {
+            $this->entityManager->persist($relationship);
+        }
+
         $this->entityManager->flush();
 
         return $result;
+    }
+
+    /**
+     * @param array<int, Player> $players
+     * @return array<int, PlayerRelationshipInput>
+     */
+    private function buildPlayerRelationshipData(array $players): array
+    {
+        $playerDataList = [];
+
+        foreach ($players as $player) {
+            $traitStrengths = [];
+
+            foreach ($player->getPlayerTraits() as $playerTrait) {
+                $traitStrengths[$playerTrait->getTraitDef()->getKey()] = $playerTrait->getStrength();
+            }
+
+            $playerDataList[] = new PlayerRelationshipInput(
+                $player->getName(),
+                $player->getDescription() ?? '',
+                $traitStrengths,
+            );
+        }
+
+        return $playerDataList;
     }
 }

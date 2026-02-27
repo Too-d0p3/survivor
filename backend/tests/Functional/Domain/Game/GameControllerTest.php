@@ -93,7 +93,20 @@ final class GameControllerTest extends AbstractFunctionalTestCase
     private function setUpMockGeminiClient(): void
     {
         $mockClient = new class implements GeminiClient {
+            private int $callCount = 0;
+
             public function request(AiRequest $aiRequest): AiResponse
+            {
+                $this->callCount++;
+
+                if ($this->callCount === 1) {
+                    return $this->buildSummariesResponse();
+                }
+
+                return $this->buildRelationshipsResponse();
+            }
+
+            private function buildSummariesResponse(): AiResponse
             {
                 $summaries = [];
                 for ($i = 1; $i <= 5; $i++) {
@@ -103,6 +116,38 @@ final class GameControllerTest extends AbstractFunctionalTestCase
                 return new AiResponse(
                     json_encode(['summaries' => $summaries], JSON_THROW_ON_ERROR),
                     new TokenUsage(100, 50, 150),
+                    200,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+
+            private function buildRelationshipsResponse(): AiResponse
+            {
+                $relationships = [];
+                $playerCount = 6;
+
+                for ($source = 1; $source <= $playerCount; $source++) {
+                    for ($target = 1; $target <= $playerCount; $target++) {
+                        if ($source === $target) {
+                            continue;
+                        }
+
+                        $relationships[] = [
+                            'source_index' => $source,
+                            'target_index' => $target,
+                            'trust' => 40 + $source + $target,
+                            'affinity' => 45 + $source,
+                            'respect' => 50 + $target,
+                            'threat' => 30 + $source * 2,
+                        ];
+                    }
+                }
+
+                return new AiResponse(
+                    json_encode(['relationships' => $relationships], JSON_THROW_ON_ERROR),
+                    new TokenUsage(200, 100, 300),
                     200,
                     'gemini-2.5-flash',
                     '{"candidates": []}',

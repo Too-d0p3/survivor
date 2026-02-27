@@ -8,9 +8,12 @@ use App\Domain\Ai\AiExecutor;
 use App\Domain\Ai\Exceptions\AiRequestFailedException;
 use App\Domain\Ai\Log\AiLog;
 use App\Domain\Ai\Operation\AiOperation;
+use App\Domain\Ai\Operation\PlayerRelationshipInput;
 use App\Domain\Ai\Result\AiCallResult;
 use App\Domain\Ai\Result\GenerateBatchSummaryResult;
 use App\Domain\Ai\Result\GenerateTraitsResult;
+use App\Domain\Ai\Result\InitializeRelationshipsResult;
+use App\Domain\Ai\Result\RelationshipValues;
 use App\Domain\Player\PlayerService;
 use App\Domain\TraitDef\TraitDef;
 use App\Domain\TraitDef\TraitType;
@@ -115,6 +118,50 @@ final class PlayerServiceTest extends TestCase
         $playerTraitStrengths = [['leadership' => '0.85']];
 
         $result = $service->generateBatchPlayerTraitsSummaryDescriptions($playerTraitStrengths, $now);
+
+        self::assertFalse($result->isSuccess());
+        self::assertSame($error, $result->getError());
+        self::assertCount(1, $result->getLogs());
+    }
+
+    public function testInitializeRelationshipsReturnsSuccessResult(): void
+    {
+        $relationshipsResult = new InitializeRelationshipsResult([
+            new RelationshipValues(1, 2, 60, 70, 55, 30),
+            new RelationshipValues(2, 1, 40, 45, 65, 80),
+        ]);
+        $log = $this->createAiLog();
+        $executor = $this->createSuccessExecutor($relationshipsResult, $log);
+        $service = new PlayerService($executor);
+        $now = new DateTimeImmutable('2026-01-15 12:00:00');
+
+        $players = [
+            new PlayerRelationshipInput('Alice', 'A strong leader', ['leadership' => '0.85']),
+            new PlayerRelationshipInput('Bob', 'A quiet observer', ['leadership' => '0.30']),
+        ];
+
+        $result = $service->initializeRelationships($players, $now);
+
+        self::assertTrue($result->isSuccess());
+        self::assertSame($relationshipsResult, $result->getResult());
+        self::assertCount(1, $result->getLogs());
+        self::assertSame($log, $result->getLogs()[0]);
+    }
+
+    public function testInitializeRelationshipsReturnsFailureResult(): void
+    {
+        $log = $this->createAiLog();
+        $error = new AiRequestFailedException('test', 500, 'Failed');
+        $executor = $this->createFailureExecutor($log, $error);
+        $service = new PlayerService($executor);
+        $now = new DateTimeImmutable('2026-01-15 12:00:00');
+
+        $players = [
+            new PlayerRelationshipInput('Alice', 'A strong leader', ['leadership' => '0.85']),
+            new PlayerRelationshipInput('Bob', 'A quiet observer', ['leadership' => '0.30']),
+        ];
+
+        $result = $service->initializeRelationships($players, $now);
 
         self::assertFalse($result->isSuccess());
         self::assertSame($error, $result->getError());

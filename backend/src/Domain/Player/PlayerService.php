@@ -7,10 +7,13 @@ namespace App\Domain\Player;
 use App\Domain\Ai\AiExecutor;
 use App\Domain\Ai\Operation\GenerateBatchPlayerSummariesOperation;
 use App\Domain\Ai\Operation\GeneratePlayerTraitsOperation;
+use App\Domain\Ai\Operation\InitializeRelationshipsOperation;
+use App\Domain\Ai\Operation\PlayerRelationshipInput;
 use App\Domain\Ai\Result\GenerateBatchPlayerSummariesServiceResult;
 use App\Domain\Ai\Result\GeneratePlayerSummaryServiceResult;
 use App\Domain\Ai\Result\GeneratePlayerTraitsServiceResult;
 use App\Domain\Ai\Result\GenerateSummaryResult;
+use App\Domain\Ai\Result\InitializeRelationshipsServiceResult;
 use App\Domain\TraitDef\TraitDef;
 use DateTimeImmutable;
 
@@ -69,6 +72,21 @@ final readonly class PlayerService
         }
 
         return GenerateBatchPlayerSummariesServiceResult::success($callResult->getResult(), [$callResult->getLog()]);
+    }
+
+    /**
+     * @param array<int, PlayerRelationshipInput> $players
+     */
+    public function initializeRelationships(array $players, DateTimeImmutable $now): InitializeRelationshipsServiceResult
+    {
+        $operation = new InitializeRelationshipsOperation($players);
+        $callResult = $this->executor->execute($operation, $now);
+
+        if (!$callResult->isSuccess()) {
+            return InitializeRelationshipsServiceResult::failure([$callResult->getLog()], $callResult->getError());
+        }
+
+        return InitializeRelationshipsServiceResult::success($callResult->getResult(), [$callResult->getLog()]);
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Domain\Ai\Result\AiResponse;
 use App\Domain\Ai\Result\TokenUsage;
 use App\Domain\Game\Game;
 use App\Domain\Game\GameFacade;
+use App\Domain\Relationship\Relationship;
 use App\Domain\TraitDef\TraitDef;
 use App\Domain\TraitDef\TraitType;
 use App\Tests\Integration\AbstractIntegrationTestCase;
@@ -103,6 +104,64 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
         self::assertCount(1, $logs);
     }
 
+    public function testCreateGamePersistsRelationshipsForAllPlayerPairs(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85', 'empathy' => '0.70']);
+
+        $relationshipRepository = $this->getEntityManager()->getRepository(Relationship::class);
+        $relationships = $relationshipRepository->findAll();
+
+        self::assertCount(30, $relationships);
+    }
+
+    public function testCreateGameRelationshipsHaveAiGeneratedScores(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85', 'empathy' => '0.70']);
+
+        $relationshipRepository = $this->getEntityManager()->getRepository(Relationship::class);
+        $relationships = $relationshipRepository->findAll();
+
+        $hasNonDefaultScore = false;
+
+        foreach ($relationships as $relationship) {
+            if (
+                $relationship->getTrust() !== 50 || $relationship->getAffinity() !== 50
+                || $relationship->getRespect() !== 50 || $relationship->getThreat() !== 50
+            ) {
+                $hasNonDefaultScore = true;
+
+                break;
+            }
+        }
+
+        self::assertTrue($hasNonDefaultScore, 'At least one relationship should have non-default scores');
+    }
+
+    public function testCreateGamePersistsRelationshipAiLog(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+
+        $aiLogRepository = $this->getEntityManager()->getRepository(AiLog::class);
+        $logs = $aiLogRepository->findBy(['actionName' => 'initializeRelationships']);
+
+        self::assertCount(1, $logs);
+    }
+
     private function seedTraitDefs(): void
     {
         $entityManager = $this->getEntityManager();
@@ -117,7 +176,20 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
     private function setUpMockGeminiClient(): void
     {
         $mockClient = new class implements GeminiClient {
+            private int $callCount = 0;
+
             public function request(AiRequest $aiRequest): AiResponse
+            {
+                $this->callCount++;
+
+                if ($this->callCount === 1) {
+                    return $this->buildSummariesResponse();
+                }
+
+                return $this->buildRelationshipsResponse();
+            }
+
+            private function buildSummariesResponse(): AiResponse
             {
                 $summaries = [];
                 for ($i = 1; $i <= 5; $i++) {
@@ -127,6 +199,38 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
                 return new AiResponse(
                     json_encode(['summaries' => $summaries], JSON_THROW_ON_ERROR),
                     new TokenUsage(100, 50, 150),
+                    200,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+
+            private function buildRelationshipsResponse(): AiResponse
+            {
+                $relationships = [];
+                $playerCount = 6;
+
+                for ($source = 1; $source <= $playerCount; $source++) {
+                    for ($target = 1; $target <= $playerCount; $target++) {
+                        if ($source === $target) {
+                            continue;
+                        }
+
+                        $relationships[] = [
+                            'source_index' => $source,
+                            'target_index' => $target,
+                            'trust' => 40 + $source + $target,
+                            'affinity' => 45 + $source,
+                            'respect' => 50 + $target,
+                            'threat' => 30 + $source * 2,
+                        ];
+                    }
+                }
+
+                return new AiResponse(
+                    json_encode(['relationships' => $relationships], JSON_THROW_ON_ERROR),
+                    new TokenUsage(200, 100, 300),
                     200,
                     'gemini-2.5-flash',
                     '{"candidates": []}',
