@@ -1,0 +1,143 @@
+##########################################################
+# Kompletni flow pro hrani hry — tick po ticku
+#
+# Pouziti:
+#   1. Spust "Login" (nebo pouzij token z auth.http)
+#   2. Spust "Create game" — vytvori hru se 6 hraci
+#   3. Spust "Start game" — zacne den 1, hodina 6:00
+#   4. Opakuj "Submit tick" s ruznym actionText
+#      - Kazdy tick posune cas o 2 hodiny
+#      - Po 22:00 automaticky nastane noc a novy den
+#   5. "Get events" zobrazí historii vsech udalosti
+#
+# Denni cyklus (9 ticku/den):
+#   6:00 → 8:00 → 10:00 (rano)
+#   12:00 → 14:00 → 16:00 (odpoledne)
+#   18:00 → 20:00 → 22:00 (vecer)
+#   → automaticky spanek → dalsi den 6:00
+##########################################################
+
+### Login (saves token)
+POST {{base_url}}/api/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.global.set("auth_token", response.body.token);
+    client.log("Logged in, token saved.");
+%}
+
+###
+
+### Create game (1 human + 5 AI players)
+POST {{base_url}}/api/game/create
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "playerName": "Ondra",
+  "playerDescription": "Chytrý stratég s přirozenou autoritou, který pod tlakem zůstává klidný.",
+  "traitStrengths": {
+    "loyal": "0.50",
+    "treacherous": "0.30",
+    "manipulative": "0.80",
+    "leader": "0.75",
+    "introverted": "0.40",
+    "naive": "0.15",
+    "strategic": "0.90",
+    "emotionally_unstable": "0.20",
+    "paranoid": "0.35",
+    "witty": "0.65"
+  }
+}
+
+> {%
+    client.global.set("game_id", response.body.id);
+    client.log("=== HRA VYTVORENA ===");
+    client.log("Game ID: " + response.body.id);
+    client.log("");
+    for (var i = 0; i < response.body.players.length; i++) {
+        var p = response.body.players[i];
+        client.log((p.isHuman ? "[TY]  " : "[AI]  ") + p.name + " — " + p.description);
+    }
+%}
+
+###
+
+### Start game — zacina den 1, 6:00
+POST {{base_url}}/api/game/{{game_id}}/start
+Authorization: Bearer {{auth_token}}
+
+> {%
+    var r = response.body;
+    client.log("=== HRA ZAHAJENA ===");
+    client.log("Den " + r.currentDay + ", " + r.currentHour + ":00 (" + r.dayPhase + ")");
+    client.log("Status: " + r.status);
+%}
+
+###
+
+##########################################################
+# HLAVNI HERNÍ SMYCKA
+#
+# Tento request spoustej opakovaně — pokaždé uprav
+# "actionText" podle toho, co chceš v daném ticku dělat.
+#
+# Příklady akcí:
+#   "Jdu sbírat dříví na oheň"
+#   "Snažím se navázat spojenectví s Alexem"
+#   "Tajně prohledávám tábor, jestli někdo neschoval immunity idol"
+#   "Povídám si s Barou u ohně a snažím se zjistit její plány"
+#   "Trénuji na soutěž o imunitu"
+##########################################################
+
+### Submit tick — zadej svoji akci
+POST {{base_url}}/api/game/{{game_id}}/tick
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "actionText": "Jdu sbírat dříví na oheň a pokouším se navázat spojenectví s ostatními"
+}
+
+> {%
+    var g = response.body.game;
+    var events = response.body.events;
+    client.log("=== TICK " + g.currentTick + " ===");
+    client.log("Den " + g.currentDay + ", " + g.currentHour + ":00 (" + g.dayPhase + ")");
+    client.log("");
+    for (var i = 0; i < events.length; i++) {
+        var e = events[i];
+        var label = "[" + e.type + "]";
+        if (e.playerName) label += " " + e.playerName;
+        if (e.metadata && e.metadata.action_text) label += ": " + e.metadata.action_text;
+        if (e.narrative) label += " — " + e.narrative;
+        client.log(label);
+    }
+%}
+
+###
+
+### Get events — historie vsech udalosti (stránkovaně)
+# Uprav limit/offset pro procházení historie
+GET {{base_url}}/api/game/{{game_id}}/events?limit=50&offset=0
+Authorization: Bearer {{auth_token}}
+
+> {%
+    var r = response.body;
+    client.log("=== HISTORIE (" + r.pagination.totalCount + " udalosti celkem) ===");
+    client.log("");
+    for (var i = 0; i < r.events.length; i++) {
+        var e = r.events[i];
+        var time = "Den " + e.day + " " + e.hour + ":00";
+        var label = time + " [" + e.type + "]";
+        if (e.playerName) label += " " + e.playerName;
+        if (e.metadata && e.metadata.action_text) label += ": " + e.metadata.action_text;
+        if (e.narrative) label += " — " + e.narrative;
+        client.log(label);
+    }
+%}

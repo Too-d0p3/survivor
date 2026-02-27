@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Domain\Game;
 
+use App\Domain\Game\Enum\GameEventType;
 use App\Domain\Game\Exceptions\CannotDeleteGameBecauseUserIsNotOwnerException;
+use App\Domain\Game\Exceptions\CannotProcessTickBecauseGameIsNotInProgressException;
+use App\Domain\Game\Exceptions\CannotStartGameBecauseUserIsNotOwnerException;
 use App\Domain\Game\Game;
 use App\Domain\Game\GameService;
 use App\Domain\Game\GameStatus;
+use App\Domain\Player\Player;
 use App\Domain\TraitDef\TraitDef;
 use App\Domain\TraitDef\TraitType;
 use App\Domain\User\User;
@@ -196,6 +200,147 @@ final class GameServiceTest extends TestCase
         self::assertSame('AI desc 3', $players[3]->getDescription());
         self::assertSame('AI desc 4', $players[4]->getDescription());
         self::assertSame('AI desc 5', $players[5]->getDescription());
+    }
+
+    public function testStartGameReturnsStartGameResult(): void
+    {
+        $owner = new User('owner@example.com');
+        $game = new Game($owner, GameStatus::Setup, new DateTimeImmutable());
+        $now = new DateTimeImmutable('2026-01-01 12:00:00');
+
+        $result = $this->gameService->startGame($game, $owner, $now);
+
+        self::assertSame($game, $result->game);
+        self::assertSame(GameStatus::InProgress, $result->game->getStatus());
+        self::assertSame(1, $result->game->getCurrentDay());
+        self::assertSame(6, $result->game->getCurrentHour());
+        self::assertSame(0, $result->game->getCurrentTick());
+    }
+
+    public function testStartGameCreatesGameStartedEvent(): void
+    {
+        $owner = new User('owner@example.com');
+        $game = new Game($owner, GameStatus::Setup, new DateTimeImmutable());
+        $now = new DateTimeImmutable('2026-01-01 12:00:00');
+
+        $result = $this->gameService->startGame($game, $owner, $now);
+
+        self::assertCount(1, $result->events);
+        $event = $result->events[0];
+        self::assertSame(GameEventType::GameStarted, $event->getType());
+        self::assertSame(1, $event->getDay());
+        self::assertSame(6, $event->getHour());
+        self::assertSame(0, $event->getTick());
+        self::assertSame($now, $event->getCreatedAt());
+    }
+
+    public function testStartGameWhenUserIsNotOwnerThrowsException(): void
+    {
+        $owner = new User('owner@example.com');
+        $otherUser = new User('other@example.com');
+        $game = new Game($owner, GameStatus::Setup, new DateTimeImmutable());
+
+        $this->expectException(CannotStartGameBecauseUserIsNotOwnerException::class);
+
+        $this->gameService->startGame($game, $otherUser, new DateTimeImmutable());
+    }
+
+    public function testProcessTickCreatesPlayerActionEvent(): void
+    {
+        $owner = new User('owner@example.com');
+        $game = new Game($owner, GameStatus::Setup, new DateTimeImmutable());
+        $game->start(new DateTimeImmutable());
+        $humanPlayer = new Player('Alice', $game, $owner);
+        $now = new DateTimeImmutable('2026-01-01 12:00:00');
+
+        $result = $this->gameService->processTick($game, $humanPlayer, 'Went fishing', $now);
+
+        $playerActionEvents = array_filter(
+            $result->events,
+            static fn ($e) => $e->getType() === GameEventType::PlayerAction,
+        );
+        self::assertCount(1, $playerActionEvents);
+
+        $event = reset($playerActionEvents);
+        self::assertSame($humanPlayer, $event->getPlayer());
+        self::assertSame(['action_text' => 'Went fishing'], $event->getMetadata());
+    }
+
+    public function testProcessTickAdvancesTime(): void
+    {
+        $owner = new User('owner@example.com');
+        $game = new Game($owner, GameStatus::Setup, new DateTimeImmutable());
+        $game->start(new DateTimeImmutable());
+        $humanPlayer = new Player('Alice', $game, $owner);
+
+        $result = $this->gameService->processTick($game, $humanPlayer, 'Went fishing', new DateTimeImmutable());
+
+        self::assertSame(1, $result->game->getCurrentTick());
+        self::assertSame(8, $result->game->getCurrentHour());
+        self::assertSame(1, $result->game->getCurrentDay());
+    }
+
+    public function testProcessTickAtHour22CreatesNightSleepEventAndSleepsToNextDay(): void
+    {
+        $owner = new User('owner@example.com');
+        $game = new Game($owner, GameStatus::Setup, new DateTimeImmutable());
+        $game->start(new DateTimeImmutable());
+        $humanPlayer = new Player('Alice', $game, $owner);
+
+        // Advance to hour 22 (tick 8, since 6 + 8*2 = 22)
+        for ($i = 0; $i < 8; $i++) {
+            $this->gameService->processTick($game, $humanPlayer, "Action {$i}", new DateTimeImmutable());
+        }
+
+        self::assertSame(22, $game->getCurrentHour());
+
+        // This tick should trigger night sleep (hour goes to 24)
+        $result = $this->gameService->processTick($game, $humanPlayer, 'Last action', new DateTimeImmutable());
+
+        $nightSleepEvents = array_filter(
+            $result->events,
+            static fn ($e) => $e->getType() === GameEventType::NightSleep,
+        );
+        self::assertCount(1, $nightSleepEvents);
+
+        self::assertSame(2, $result->game->getCurrentDay());
+        self::assertSame(6, $result->game->getCurrentHour());
+    }
+
+    public function testProcessTickAtHour12DoesNotCreateNightSleepEvent(): void
+    {
+        $owner = new User('owner@example.com');
+        $game = new Game($owner, GameStatus::Setup, new DateTimeImmutable());
+        $game->start(new DateTimeImmutable());
+        $humanPlayer = new Player('Alice', $game, $owner);
+
+        // Advance to hour 12 (tick 3, since 6 + 3*2 = 12)
+        for ($i = 0; $i < 3; $i++) {
+            $this->gameService->processTick($game, $humanPlayer, "Action {$i}", new DateTimeImmutable());
+        }
+
+        self::assertSame(12, $game->getCurrentHour());
+
+        $result = $this->gameService->processTick($game, $humanPlayer, 'Afternoon action', new DateTimeImmutable());
+
+        $nightSleepEvents = array_filter(
+            $result->events,
+            static fn ($e) => $e->getType() === GameEventType::NightSleep,
+        );
+        self::assertCount(0, $nightSleepEvents);
+
+        self::assertSame(1, $result->game->getCurrentDay());
+    }
+
+    public function testProcessTickWhenGameNotInProgressThrowsException(): void
+    {
+        $owner = new User('owner@example.com');
+        $game = new Game($owner, GameStatus::Setup, new DateTimeImmutable());
+        $humanPlayer = new Player('Alice', $game, $owner);
+
+        $this->expectException(CannotProcessTickBecauseGameIsNotInProgressException::class);
+
+        $this->gameService->processTick($game, $humanPlayer, 'Action', new DateTimeImmutable());
     }
 
     protected function setUp(): void

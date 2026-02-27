@@ -8,10 +8,13 @@ use App\Domain\Ai\Client\GeminiClient;
 use App\Domain\Ai\Dto\AiRequest;
 use App\Domain\Ai\Result\AiResponse;
 use App\Domain\Ai\Result\TokenUsage;
+use App\Domain\Game\GameFacade;
 use App\Domain\TraitDef\TraitDef;
 use App\Domain\TraitDef\TraitType;
+use App\Domain\User\User;
 use App\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Uid\Uuid;
 
 final class GameControllerTest extends AbstractFunctionalTestCase
 {
@@ -77,6 +80,162 @@ final class GameControllerTest extends AbstractFunctionalTestCase
         ]);
 
         self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testStartGameReturnsGameWithTimeFields(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameId = $this->createGameViaFacade($user);
+
+        $this->getBrowser()->loginUser($user);
+        $this->jsonRequest('POST', "/api/game/{$gameId}/start");
+
+        self::assertResponseIsSuccessful();
+
+        $content = $this->getBrowser()->getResponse()->getContent();
+        self::assertNotFalse($content);
+
+        /** @var array<string, mixed> $responseData */
+        $responseData = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame($gameId, $responseData['id']);
+        self::assertSame('in_progress', $responseData['status']);
+        self::assertSame(1, $responseData['currentDay']);
+        self::assertSame(6, $responseData['currentHour']);
+        self::assertSame(0, $responseData['currentTick']);
+        self::assertSame('morning', $responseData['dayPhase']);
+        self::assertArrayHasKey('startedAt', $responseData);
+    }
+
+    public function testStartGameWithoutAuthReturns401(): void
+    {
+        $this->jsonRequest('POST', '/api/game/00000000-0000-0000-0000-000000000001/start');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    public function testProcessTickReturnsUpdatedGameAndEvents(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameId = $this->createStartedGameViaFacade($user);
+
+        $this->getBrowser()->loginUser($user);
+        $this->jsonRequest('POST', "/api/game/{$gameId}/tick", [
+            'actionText' => 'Went fishing',
+        ]);
+
+        self::assertResponseIsSuccessful();
+
+        $content = $this->getBrowser()->getResponse()->getContent();
+        self::assertNotFalse($content);
+
+        /** @var array<string, mixed> $responseData */
+        $responseData = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertArrayHasKey('game', $responseData);
+        self::assertArrayHasKey('events', $responseData);
+
+        /** @var array<string, mixed> $game */
+        $game = $responseData['game'];
+        self::assertSame(1, $game['currentTick']);
+        self::assertSame(8, $game['currentHour']);
+        self::assertSame('morning', $game['dayPhase']);
+
+        self::assertIsArray($responseData['events']);
+        self::assertNotEmpty($responseData['events']);
+    }
+
+    public function testProcessTickWithMissingActionTextReturns400(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameId = $this->createStartedGameViaFacade($user);
+
+        $this->getBrowser()->loginUser($user);
+        $this->jsonRequest('POST', "/api/game/{$gameId}/tick", []);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testProcessTickWithoutAuthReturns401(): void
+    {
+        $this->jsonRequest('POST', '/api/game/00000000-0000-0000-0000-000000000001/tick', [
+            'actionText' => 'Test action',
+        ]);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    public function testGetGameEventsReturnsPaginatedEvents(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameId = $this->createStartedGameViaFacade($user);
+
+        /** @var GameFacade $gameFacade */
+        $gameFacade = self::getContainer()->get(GameFacade::class);
+        $gameFacade->processTick(Uuid::fromString($gameId), $user, 'Action 1');
+        $gameFacade->processTick(Uuid::fromString($gameId), $user, 'Action 2');
+
+        $this->getBrowser()->loginUser($user);
+        $this->getBrowser()->request('GET', "/api/game/{$gameId}/events?limit=2&offset=0");
+
+        self::assertResponseIsSuccessful();
+
+        $content = $this->getBrowser()->getResponse()->getContent();
+        self::assertNotFalse($content);
+
+        /** @var array<string, mixed> $responseData */
+        $responseData = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertArrayHasKey('events', $responseData);
+        self::assertArrayHasKey('pagination', $responseData);
+        self::assertIsArray($responseData['events']);
+        self::assertCount(2, $responseData['events']);
+
+        /** @var array<string, mixed> $pagination */
+        $pagination = $responseData['pagination'];
+        self::assertSame(3, $pagination['totalCount']);
+        self::assertSame(2, $pagination['limit']);
+        self::assertSame(0, $pagination['offset']);
+    }
+
+    public function testGetGameEventsWithoutAuthReturns401(): void
+    {
+        $this->getBrowser()->request('GET', '/api/game/00000000-0000-0000-0000-000000000001/events');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    private function createGameViaFacade(User $user): string
+    {
+        /** @var GameFacade $gameFacade */
+        $gameFacade = self::getContainer()->get(GameFacade::class);
+
+        $result = $gameFacade->createGame($user, 'TestPlayer', 'A brave adventurer', ['leadership' => '0.85', 'empathy' => '0.70']);
+
+        return $result->game->getId()->toString();
+    }
+
+    private function createStartedGameViaFacade(User $user): string
+    {
+        $gameId = $this->createGameViaFacade($user);
+
+        /** @var GameFacade $gameFacade */
+        $gameFacade = self::getContainer()->get(GameFacade::class);
+        $gameFacade->startGame(Uuid::fromString($gameId), $user);
+
+        return $gameId;
     }
 
     private function seedTraitDefs(): void

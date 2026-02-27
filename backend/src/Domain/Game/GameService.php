@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace App\Domain\Game;
 
+use App\Domain\Game\Enum\GameEventType;
 use App\Domain\Game\Exceptions\CannotDeleteGameBecauseUserIsNotOwnerException;
+use App\Domain\Game\Exceptions\CannotProcessTickBecauseGameIsNotInProgressException;
+use App\Domain\Game\Exceptions\CannotStartGameBecauseUserIsNotOwnerException;
 use App\Domain\Game\Result\CreateGameResult;
+use App\Domain\Game\Result\ProcessTickResult;
+use App\Domain\Game\Result\StartGameResult;
 use App\Domain\Player\Player;
 use App\Domain\Player\Trait\PlayerTrait;
 use App\Domain\TraitDef\TraitDef;
@@ -61,6 +66,88 @@ final class GameService
         }
 
         return $game;
+    }
+
+    /**
+     * @throws CannotStartGameBecauseUserIsNotOwnerException
+     */
+    public function startGame(Game $game, User $requestingUser, DateTimeImmutable $now): StartGameResult
+    {
+        if ($game->getOwner() !== $requestingUser) {
+            throw new CannotStartGameBecauseUserIsNotOwnerException($game, $requestingUser);
+        }
+
+        $game->start($now);
+
+        $event = new GameEvent(
+            $game,
+            GameEventType::GameStarted,
+            1,
+            6,
+            0,
+            $now,
+        );
+
+        return new StartGameResult($game, [$event]);
+    }
+
+    /**
+     * @throws CannotProcessTickBecauseGameIsNotInProgressException
+     */
+    public function processTick(Game $game, Player $humanPlayer, string $actionText, DateTimeImmutable $now): ProcessTickResult
+    {
+        if ($game->getStatus() !== GameStatus::InProgress) {
+            throw new CannotProcessTickBecauseGameIsNotInProgressException($game);
+        }
+
+        $events = [];
+
+        /** @var int $currentDay */
+        $currentDay = $game->getCurrentDay();
+        /** @var int $currentHour */
+        $currentHour = $game->getCurrentHour();
+        /** @var int $currentTick */
+        $currentTick = $game->getCurrentTick();
+
+        $playerActionEvent = new GameEvent(
+            $game,
+            GameEventType::PlayerAction,
+            $currentDay,
+            $currentHour,
+            $currentTick,
+            $now,
+            $humanPlayer,
+            null,
+            ['action_text' => $actionText],
+        );
+        $events[] = $playerActionEvent;
+
+        // [FUTURE HOOK: AI player actions]
+        // [FUTURE HOOK: relationship updates]
+        // [FUTURE HOOK: narrative generation]
+
+        $game->advanceTick();
+
+        if ($game->getCurrentHour() >= 24) {
+            /** @var int $advancedDay */
+            $advancedDay = $game->getCurrentDay();
+            /** @var int $advancedTick */
+            $advancedTick = $game->getCurrentTick();
+
+            $nightSleepEvent = new GameEvent(
+                $game,
+                GameEventType::NightSleep,
+                $advancedDay,
+                22,
+                $advancedTick,
+                $now,
+            );
+            $events[] = $nightSleepEvent;
+
+            $game->sleepToNextDay();
+        }
+
+        return new ProcessTickResult($game, $events);
     }
 
     /**

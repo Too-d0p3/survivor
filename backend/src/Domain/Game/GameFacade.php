@@ -5,14 +5,20 @@ declare(strict_types=1);
 namespace App\Domain\Game;
 
 use App\Domain\Ai\Operation\PlayerRelationshipInput;
+use App\Domain\Game\Exceptions\CannotProcessTickBecauseUserIsNotPlayerException;
 use App\Domain\Game\Result\CreateGameResult;
+use App\Domain\Game\Result\GameEventsResult;
+use App\Domain\Game\Result\ProcessTickResult;
+use App\Domain\Game\Result\StartGameResult;
 use App\Domain\Player\Player;
+use App\Domain\Player\PlayerRepository;
 use App\Domain\Player\PlayerService;
 use App\Domain\Relationship\RelationshipService;
 use App\Domain\TraitDef\TraitDefRepository;
 use App\Domain\User\User;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Uid\Uuid;
 
 final class GameFacade
 {
@@ -20,7 +26,13 @@ final class GameFacade
 
     private readonly GameService $gameService;
 
+    private readonly GameRepository $gameRepository;
+
+    private readonly GameEventRepository $gameEventRepository;
+
     private readonly PlayerService $playerService;
+
+    private readonly PlayerRepository $playerRepository;
 
     private readonly RelationshipService $relationshipService;
 
@@ -29,13 +41,19 @@ final class GameFacade
     public function __construct(
         EntityManagerInterface $entityManager,
         GameService $gameService,
+        GameRepository $gameRepository,
+        GameEventRepository $gameEventRepository,
         PlayerService $playerService,
+        PlayerRepository $playerRepository,
         RelationshipService $relationshipService,
         TraitDefRepository $traitDefRepository,
     ) {
         $this->entityManager = $entityManager;
         $this->gameService = $gameService;
+        $this->gameRepository = $gameRepository;
+        $this->gameEventRepository = $gameEventRepository;
         $this->playerService = $playerService;
+        $this->playerRepository = $playerRepository;
         $this->relationshipService = $relationshipService;
         $this->traitDefRepository = $traitDefRepository;
     }
@@ -120,6 +138,55 @@ final class GameFacade
         $this->entityManager->flush();
 
         return $result;
+    }
+
+    public function startGame(Uuid $gameId, User $currentUser): StartGameResult
+    {
+        $now = new DateTimeImmutable();
+        $game = $this->gameRepository->getGame($gameId);
+
+        $result = $this->gameService->startGame($game, $currentUser, $now);
+
+        foreach ($result->events as $event) {
+            $this->entityManager->persist($event);
+        }
+
+        $this->entityManager->flush();
+
+        return $result;
+    }
+
+    public function processTick(Uuid $gameId, User $currentUser, string $actionText): ProcessTickResult
+    {
+        $now = new DateTimeImmutable();
+        $game = $this->gameRepository->getGame($gameId);
+        $humanPlayer = $this->playerRepository->getHumanPlayerByGame($game->getId());
+
+        $humanPlayerUser = $humanPlayer->getUser();
+
+        if ($humanPlayerUser === null || !$humanPlayerUser->getId()->equals($currentUser->getId())) {
+            throw new CannotProcessTickBecauseUserIsNotPlayerException($game, $currentUser);
+        }
+
+        $result = $this->gameService->processTick($game, $humanPlayer, $actionText, $now);
+
+        foreach ($result->events as $event) {
+            $this->entityManager->persist($event);
+        }
+
+        $this->entityManager->flush();
+
+        return $result;
+    }
+
+    public function getGameEvents(Uuid $gameId, int $limit, int $offset): GameEventsResult
+    {
+        $this->gameRepository->getGame($gameId);
+
+        $events = $this->gameEventRepository->findByGamePaginated($gameId, $limit, $offset);
+        $totalCount = $this->gameEventRepository->countByGame($gameId);
+
+        return new GameEventsResult($events, $totalCount, $limit, $offset);
     }
 
     /**

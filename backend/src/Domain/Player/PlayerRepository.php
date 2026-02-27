@@ -37,4 +37,24 @@ class PlayerRepository extends ServiceEntityRepository
 
         return $player;
     }
+
+    /**
+     * @throws PlayerNotFoundException
+     */
+    public function getHumanPlayerByGame(Uuid $gameId): Player
+    {
+        /** @var Player|null $player */
+        $player = $this->createQueryBuilder('player')
+            ->where('player.game = :gameId')
+            ->andWhere('player.user IS NOT NULL')
+            ->setParameter('gameId', $gameId)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        if ($player === null) {
+            throw new PlayerNotFoundException($gameId);
+        }
+
+        return $player;
+    }
 }

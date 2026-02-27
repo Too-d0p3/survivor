@@ -9,8 +9,12 @@ use App\Domain\Ai\Dto\AiRequest;
 use App\Domain\Ai\Log\AiLog;
 use App\Domain\Ai\Result\AiResponse;
 use App\Domain\Ai\Result\TokenUsage;
+use App\Domain\Game\Enum\GameEventType;
+use App\Domain\Game\Exceptions\CannotProcessTickBecauseUserIsNotPlayerException;
 use App\Domain\Game\Game;
+use App\Domain\Game\GameEvent;
 use App\Domain\Game\GameFacade;
+use App\Domain\Game\GameStatus;
 use App\Domain\Relationship\Relationship;
 use App\Domain\TraitDef\TraitDef;
 use App\Domain\TraitDef\TraitType;
@@ -160,6 +164,150 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
         $logs = $aiLogRepository->findBy(['actionName' => 'initializeRelationships']);
 
         self::assertCount(1, $logs);
+    }
+
+    public function testStartGamePersistsGameInProgressWithTimeFields(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+
+        $startResult = $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $foundGame = $this->getEntityManager()->find(Game::class, $startResult->game->getId());
+        self::assertNotNull($foundGame);
+        self::assertSame(GameStatus::InProgress, $foundGame->getStatus());
+        self::assertSame(1, $foundGame->getCurrentDay());
+        self::assertSame(6, $foundGame->getCurrentHour());
+        self::assertSame(0, $foundGame->getCurrentTick());
+        self::assertNotNull($foundGame->getStartedAt());
+    }
+
+    public function testStartGamePersistsGameStartedEvent(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $eventRepository = $this->getEntityManager()->getRepository(GameEvent::class);
+        $events = $eventRepository->findBy(['game' => $createResult->game->getId()]);
+
+        self::assertCount(1, $events);
+        self::assertSame(GameEventType::GameStarted, $events[0]->getType());
+    }
+
+    public function testProcessTickPersistsPlayerActionEvent(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $tickResult = $gameFacade->processTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $playerActionEvents = array_filter(
+            $tickResult->events,
+            static fn (GameEvent $e) => $e->getType() === GameEventType::PlayerAction,
+        );
+        self::assertCount(1, $playerActionEvents);
+
+        $event = reset($playerActionEvents);
+        self::assertSame(['action_text' => 'Went fishing'], $event->getMetadata());
+    }
+
+    public function testProcessTickAdvancesGameTime(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $gameFacade->processTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $foundGame = $this->getEntityManager()->find(Game::class, $createResult->game->getId());
+        self::assertNotNull($foundGame);
+        self::assertSame(1, $foundGame->getCurrentTick());
+        self::assertSame(8, $foundGame->getCurrentHour());
+    }
+
+    public function testProcessTickAtNightPersistsNightSleepAndAdvancesDay(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        // Advance through 8 ticks (hours: 6->8->10->12->14->16->18->20->22)
+        for ($i = 0; $i < 8; $i++) {
+            $gameFacade->processTick($createResult->game->getId(), $user, "Action {$i}");
+        }
+
+        // 9th tick at hour 22 should trigger night sleep
+        $result = $gameFacade->processTick($createResult->game->getId(), $user, 'Last action');
+
+        $nightSleepEvents = array_filter(
+            $result->events,
+            static fn (GameEvent $e) => $e->getType() === GameEventType::NightSleep,
+        );
+        self::assertCount(1, $nightSleepEvents);
+
+        $foundGame = $this->getEntityManager()->find(Game::class, $createResult->game->getId());
+        self::assertNotNull($foundGame);
+        self::assertSame(2, $foundGame->getCurrentDay());
+        self::assertSame(6, $foundGame->getCurrentHour());
+    }
+
+    public function testGetGameEventsReturnsPaginatedResults(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+        $gameFacade->processTick($createResult->game->getId(), $user, 'Action 1');
+        $gameFacade->processTick($createResult->game->getId(), $user, 'Action 2');
+
+        $eventsResult = $gameFacade->getGameEvents($createResult->game->getId(), 2, 0);
+
+        self::assertCount(2, $eventsResult->events);
+        self::assertSame(3, $eventsResult->totalCount);
+        self::assertSame(2, $eventsResult->limit);
+        self::assertSame(0, $eventsResult->offset);
+    }
+
+    public function testProcessTickWhenUserIsNotPlayerThrowsException(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+        $otherUser = $this->createAndPersistUser('other@example.com');
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $this->expectException(CannotProcessTickBecauseUserIsNotPlayerException::class);
+
+        $gameFacade->processTick($createResult->game->getId(), $otherUser, 'Action');
     }
 
     private function seedTraitDefs(): void

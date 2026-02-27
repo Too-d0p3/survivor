@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Game;
 
+use App\Domain\Game\Exceptions\CannotAdvanceTickBecauseGameIsNotInProgressException;
+use App\Domain\Game\Exceptions\CannotStartGameBecauseGameIsNotInSetupException;
 use App\Domain\Player\Player;
 use App\Domain\User\User;
 use DateTimeImmutable;
@@ -34,6 +36,18 @@ final class Game
     #[ORM\JoinColumn(nullable: false)]
     private User $owner;
 
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    private ?int $currentDay = null;
+
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    private ?int $currentHour = null;
+
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    private ?int $currentTick = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?DateTimeImmutable $startedAt = null;
+
     public function __construct(User $owner, GameStatus $status, DateTimeImmutable $createdAt)
     {
         $this->id = Uuid::v7();
@@ -41,6 +55,44 @@ final class Game
         $this->status = $status;
         $this->createdAt = $createdAt;
         $this->players = new ArrayCollection();
+    }
+
+    public function start(DateTimeImmutable $startedAt): void
+    {
+        if ($this->status !== GameStatus::Setup) {
+            throw new CannotStartGameBecauseGameIsNotInSetupException($this);
+        }
+
+        $this->status = GameStatus::InProgress;
+        $this->currentDay = 1;
+        $this->currentHour = 6;
+        $this->currentTick = 0;
+        $this->startedAt = $startedAt;
+    }
+
+    public function advanceTick(): void
+    {
+        if ($this->status !== GameStatus::InProgress) {
+            throw new CannotAdvanceTickBecauseGameIsNotInProgressException($this);
+        }
+
+        assert($this->currentTick !== null);
+        assert($this->currentHour !== null);
+
+        $this->currentTick++;
+        $this->currentHour += 2;
+    }
+
+    public function sleepToNextDay(): void
+    {
+        if ($this->status !== GameStatus::InProgress) {
+            throw new CannotAdvanceTickBecauseGameIsNotInProgressException($this);
+        }
+
+        assert($this->currentDay !== null);
+
+        $this->currentDay++;
+        $this->currentHour = 6;
     }
 
     public function addPlayer(Player $player): void
@@ -84,5 +136,25 @@ final class Game
     public function getOwner(): User
     {
         return $this->owner;
+    }
+
+    public function getCurrentDay(): ?int
+    {
+        return $this->currentDay;
+    }
+
+    public function getCurrentHour(): ?int
+    {
+        return $this->currentHour;
+    }
+
+    public function getCurrentTick(): ?int
+    {
+        return $this->currentTick;
+    }
+
+    public function getStartedAt(): ?DateTimeImmutable
+    {
+        return $this->startedAt;
     }
 }
