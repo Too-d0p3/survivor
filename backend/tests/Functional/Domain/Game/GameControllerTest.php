@@ -217,6 +217,72 @@ final class GameControllerTest extends AbstractFunctionalTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
+    public function testPreviewTickReturnsSimulationDataWithoutAdvancingGame(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameId = $this->createStartedGameViaFacade($user);
+
+        $this->getBrowser()->loginUser($user);
+        $this->jsonRequest('POST', "/api/game/{$gameId}/tick/preview", [
+            'actionText' => 'Went fishing',
+        ]);
+
+        self::assertResponseIsSuccessful();
+
+        $content = $this->getBrowser()->getResponse()->getContent();
+        self::assertNotFalse($content);
+
+        /** @var array<string, mixed> $responseData */
+        $responseData = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertArrayHasKey('game', $responseData);
+        self::assertArrayHasKey('simulation', $responseData);
+
+        /** @var array<string, mixed> $game */
+        $game = $responseData['game'];
+        self::assertSame(0, $game['currentTick']);
+        self::assertSame(6, $game['currentHour']);
+        self::assertSame(1, $game['currentDay']);
+        self::assertSame('morning', $game['dayPhase']);
+
+        /** @var array<string, mixed> $simulation */
+        $simulation = $responseData['simulation'];
+        self::assertArrayHasKey('reasoning', $simulation);
+        self::assertArrayHasKey('playerLocation', $simulation);
+        self::assertArrayHasKey('playersNearby', $simulation);
+        self::assertArrayHasKey('macroNarrative', $simulation);
+        self::assertArrayHasKey('playerNarrative', $simulation);
+        self::assertArrayHasKey('relationshipChanges', $simulation);
+        self::assertNotEmpty($simulation['reasoning']);
+        self::assertNotEmpty($simulation['macroNarrative']);
+    }
+
+    public function testPreviewTickWithoutAuthReturns401(): void
+    {
+        $this->jsonRequest('POST', '/api/game/00000000-0000-0000-0000-000000000001/tick/preview', [
+            'actionText' => 'Test action',
+        ]);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    public function testPreviewTickWithMissingActionTextReturns400(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameId = $this->createStartedGameViaFacade($user);
+
+        $this->getBrowser()->loginUser($user);
+        $this->jsonRequest('POST', "/api/game/{$gameId}/tick/preview", []);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
     private function createGameViaFacade(User $user): string
     {
         /** @var GameFacade $gameFacade */

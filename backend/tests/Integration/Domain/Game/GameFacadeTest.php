@@ -416,6 +416,163 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
         $gameFacade->processTick($createResult->game->getId(), $otherUser, 'Action');
     }
 
+    public function testPreviewTickReturnsSimulationResult(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $result = $gameFacade->previewTick($createResult->game->getId(), $user, 'Went fishing');
+
+        self::assertNotEmpty($result->game->getId()->toRfc4122());
+        self::assertNotEmpty($result->simulation->getReasoning());
+        self::assertNotEmpty($result->simulation->getMacroNarrative());
+        self::assertNotEmpty($result->simulation->getPlayerNarrative());
+        self::assertNotEmpty($result->simulation->getPlayerLocation());
+    }
+
+    public function testPreviewTickDoesNotAdvanceGameTime(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $gameFacade->previewTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $foundGame = $this->getEntityManager()->find(Game::class, $createResult->game->getId());
+        self::assertNotNull($foundGame);
+        self::assertSame(1, $foundGame->getCurrentDay());
+        self::assertSame(6, $foundGame->getCurrentHour());
+        self::assertSame(0, $foundGame->getCurrentTick());
+    }
+
+    public function testPreviewTickDoesNotCreateAnyGameEvents(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $gameFacade->previewTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $eventRepository = $this->getEntityManager()->getRepository(GameEvent::class);
+        $events = $eventRepository->findBy(['game' => $createResult->game->getId()]);
+
+        // Only the GameStarted event from startGame() should exist
+        self::assertCount(1, $events);
+        self::assertSame(GameEventType::GameStarted, $events[0]->getType());
+    }
+
+    public function testPreviewTickDoesNotMutateRelationships(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        // Capture relationship scores before preview
+        $relationshipRepository = $this->getEntityManager()->getRepository(Relationship::class);
+        $relationshipsBefore = $relationshipRepository->findAll();
+
+        /** @var array<string, array{trust: int, affinity: int, respect: int, threat: int}> $scoresBefore */
+        $scoresBefore = [];
+        foreach ($relationshipsBefore as $rel) {
+            $key = $rel->getSource()->getId()->toString() . '->' . $rel->getTarget()->getId()->toString();
+            $scoresBefore[$key] = [
+                'trust' => $rel->getTrust(),
+                'affinity' => $rel->getAffinity(),
+                'respect' => $rel->getRespect(),
+                'threat' => $rel->getThreat(),
+            ];
+        }
+
+        $gameFacade->previewTick($createResult->game->getId(), $user, 'Went fishing');
+
+        // Clear entity manager to force fresh load from DB
+        $this->getEntityManager()->clear();
+
+        $relationshipsAfter = $this->getEntityManager()->getRepository(Relationship::class)->findAll();
+        foreach ($relationshipsAfter as $rel) {
+            $key = $rel->getSource()->getId()->toString() . '->' . $rel->getTarget()->getId()->toString();
+            self::assertArrayHasKey($key, $scoresBefore);
+            self::assertSame($scoresBefore[$key]['trust'], $rel->getTrust(), "Trust changed for {$key}");
+            self::assertSame($scoresBefore[$key]['affinity'], $rel->getAffinity(), "Affinity changed for {$key}");
+            self::assertSame($scoresBefore[$key]['respect'], $rel->getRespect(), "Respect changed for {$key}");
+            self::assertSame($scoresBefore[$key]['threat'], $rel->getThreat(), "Threat changed for {$key}");
+        }
+    }
+
+    public function testPreviewTickPersistsAiLog(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $gameFacade->previewTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $aiLogRepository = $this->getEntityManager()->getRepository(AiLog::class);
+        $logs = $aiLogRepository->findBy(['actionName' => 'simulateTick']);
+
+        self::assertCount(1, $logs);
+    }
+
+    public function testPreviewTickWhenUserIsNotPlayerThrowsException(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+        $otherUser = $this->createAndPersistUser('other@example.com');
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $this->expectException(CannotProcessTickBecauseUserIsNotPlayerException::class);
+
+        $gameFacade->previewTick($createResult->game->getId(), $otherUser, 'Action');
+    }
+
+    public function testPreviewTickWhenSimulationFailsThrowsExceptionAndPersistsLog(): void
+    {
+        $this->setUpFailingSimulationMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        try {
+            $gameFacade->previewTick($createResult->game->getId(), $user, 'Went fishing');
+            self::fail('Expected CannotProcessTickBecauseSimulationFailedException');
+        } catch (CannotProcessTickBecauseSimulationFailedException) {
+            // Expected
+        }
+
+        $aiLogRepository = $this->getEntityManager()->getRepository(AiLog::class);
+        $logs = $aiLogRepository->findBy(['actionName' => 'simulateTick']);
+
+        self::assertCount(1, $logs);
+    }
+
     private function seedTraitDefs(): void
     {
         $entityManager = $this->getEntityManager();

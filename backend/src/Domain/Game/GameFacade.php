@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Domain\Game;
 
 use App\Domain\Ai\Operation\PlayerRelationshipInput;
+use App\Domain\Game\Exceptions\CannotProcessTickBecauseGameIsNotInProgressException;
 use App\Domain\Game\Exceptions\CannotProcessTickBecauseSimulationFailedException;
 use App\Domain\Game\Exceptions\CannotProcessTickBecauseUserIsNotPlayerException;
 use App\Domain\Game\Result\CreateGameResult;
 use App\Domain\Game\Result\GameEventsResult;
+use App\Domain\Game\Result\PreviewTickResult;
 use App\Domain\Game\Result\ProcessTickResult;
 use App\Domain\Game\Result\StartGameResult;
 use App\Domain\Player\Player;
@@ -256,6 +258,66 @@ final class GameFacade
         $this->entityManager->flush();
 
         return new ProcessTickResult($game, $allEvents);
+    }
+
+    public function previewTick(Uuid $gameId, User $currentUser, string $actionText): PreviewTickResult
+    {
+        $now = new DateTimeImmutable();
+        $game = $this->gameRepository->getGame($gameId);
+        $humanPlayer = $this->playerRepository->getHumanPlayerByGame($game->getId());
+
+        $humanPlayerUser = $humanPlayer->getUser();
+
+        if ($humanPlayerUser === null || !$humanPlayerUser->getId()->equals($currentUser->getId())) {
+            throw new CannotProcessTickBecauseUserIsNotPlayerException($game, $currentUser);
+        }
+
+        if ($game->getStatus() !== GameStatus::InProgress) {
+            throw new CannotProcessTickBecauseGameIsNotInProgressException($game);
+        }
+
+        /** @var int $currentDay */
+        $currentDay = $game->getCurrentDay();
+        /** @var int $currentHour */
+        $currentHour = $game->getCurrentHour();
+        /** @var int $currentTick */
+        $currentTick = $game->getCurrentTick();
+
+        $allPlayers = $game->getPlayers();
+        $allRelationships = $this->relationshipRepository->findByGame($game->getId());
+
+        $fromTick = max(0, $currentTick - 3);
+        $recentEvents = $this->gameEventRepository->findByGameFromTick($game->getId(), $fromTick);
+
+        $playerInputs = SimulationContextBuilder::buildPlayerInputs($allPlayers);
+        $relationshipInputs = SimulationContextBuilder::buildRelationshipInputs($allRelationships, $allPlayers);
+        $eventInputs = SimulationContextBuilder::buildEventInputs($recentEvents, $allPlayers);
+        $humanPlayerIndex = SimulationContextBuilder::findHumanPlayerIndex($allPlayers);
+
+        $simulationServiceResult = $this->simulationAiService->simulateTick(
+            $currentDay,
+            $currentHour,
+            $actionText,
+            $playerInputs,
+            $relationshipInputs,
+            $eventInputs,
+            $humanPlayerIndex,
+            $now,
+        );
+
+        foreach ($simulationServiceResult->getLogs() as $log) {
+            $this->entityManager->persist($log);
+        }
+
+        if (!$simulationServiceResult->isSuccess()) {
+            $this->entityManager->flush();
+
+            throw new CannotProcessTickBecauseSimulationFailedException($game, $simulationServiceResult->getError());
+        }
+
+        $this->entityManager->flush();
+
+        return new PreviewTickResult($game, $simulationServiceResult->getResult());
     }
 
     public function getGameEvents(Uuid $gameId, int $limit, int $offset): GameEventsResult

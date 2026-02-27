@@ -122,6 +122,44 @@ Content-Type: application/json
 
 ###
 
+### Preview tick — dry-run simulace BEZ uložení změn do hry
+# Spustí AI simulaci se stejným kontextem jako normální tick,
+# ale NEPOSUNE čas, NEVYTVOŘÍ eventy a NEZMĚNÍ vztahy.
+# Pouze uloží AI log. Lze opakovat na stejném stavu.
+POST {{base_url}}/api/game/{{game_id}}/tick/preview
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "actionText": "Půjdu na pláž svolám všechny a řeknu jím že to jsou úplní kokoti a že je nenávidím."
+}
+
+> {%
+    var g = response.body.game;
+    var s = response.body.simulation;
+    client.log("=== PREVIEW (dry-run, hra se nezmenila) ===");
+    client.log("Den " + g.currentDay + ", " + g.currentHour + ":00 (" + g.dayPhase + "), tick " + g.currentTick);
+    client.log("");
+    client.log("[Reasoning] " + s.reasoning);
+    client.log("[Lokace] " + s.playerLocation);
+    client.log("[Hráči poblíž] " + JSON.stringify(s.playersNearby));
+    client.log("");
+    client.log("[Macro] " + s.macroNarrative);
+    client.log("[Player] " + s.playerNarrative);
+    client.log("");
+    if (s.relationshipChanges && s.relationshipChanges.length > 0) {
+        client.log("[Vztahy]");
+        for (var i = 0; i < s.relationshipChanges.length; i++) {
+            var rc = s.relationshipChanges[i];
+            client.log("  " + rc.source_index + " → " + rc.target_index +
+                " | trust:" + rc.trust_delta + " affinity:" + rc.affinity_delta +
+                " respect:" + rc.respect_delta + " threat:" + rc.threat_delta);
+        }
+    }
+%}
+
+###
+
 ### Get events — historie vsech udalosti (stránkovaně)
 # Uprav limit/offset pro procházení historie
 GET {{base_url}}/api/game/{{game_id}}/events?limit=50&offset=0

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Game;
 
+use App\Domain\Ai\Result\RelationshipDelta;
 use App\Domain\Game\Enum\DayPhase;
 use App\Domain\Game\Enum\GameEventType;
 use App\Domain\User\User;
@@ -152,6 +153,55 @@ final class GameController extends AbstractApiController
         ]);
     }
 
+    #[Route('/api/game/{id}/tick/preview', name: 'game_tick_preview', methods: ['POST'])]
+    public function previewTick(
+        string $id,
+        #[CurrentUser] ?User $user,
+        Request $request,
+        SerializerInterface $serializer,
+        ValidatorInterface $validator,
+    ): JsonResponse {
+        if ($user === null) {
+            return $this->json(['message' => 'Not authenticated'], 401);
+        }
+
+        $validationResult = $this->getValidatedDto($request, ProcessTickInput::class, $serializer, $validator);
+
+        if (!$validationResult->isValid()) {
+            return $this->json(['errors' => $validationResult->errors], 400);
+        }
+
+        assert($validationResult->dto instanceof ProcessTickInput);
+
+        $gameId = Uuid::fromString($id);
+        $result = $this->gameFacade->previewTick($gameId, $user, $validationResult->dto->actionText);
+
+        $game = $result->game;
+        $simulation = $result->simulation;
+
+        /** @var int $previewCurrentHour */
+        $previewCurrentHour = $game->getCurrentHour();
+
+        return $this->json([
+            'game' => [
+                'id' => $game->getId()->toString(),
+                'status' => $game->getStatus()->value,
+                'currentDay' => $game->getCurrentDay(),
+                'currentHour' => $previewCurrentHour,
+                'currentTick' => $game->getCurrentTick(),
+                'dayPhase' => DayPhase::fromHour($previewCurrentHour)->value,
+            ],
+            'simulation' => [
+                'reasoning' => $simulation->getReasoning(),
+                'playerLocation' => $simulation->getPlayerLocation(),
+                'playersNearby' => $simulation->getPlayersNearby(),
+                'macroNarrative' => $simulation->getMacroNarrative(),
+                'playerNarrative' => $simulation->getPlayerNarrative(),
+                'relationshipChanges' => $this->serializeRelationshipDeltas($simulation->getRelationshipChanges()),
+            ],
+        ]);
+    }
+
     #[Route('/api/game/{id}/events', name: 'game_events', methods: ['GET'])]
     public function getGameEvents(
         string $id,
@@ -238,5 +288,27 @@ final class GameController extends AbstractApiController
             'metadata' => $event->getMetadata(),
             'createdAt' => $event->getCreatedAt()->format('c'),
         ];
+    }
+
+    /**
+     * @param array<int, RelationshipDelta> $deltas
+     * @return array<int, array<string, int>>
+     */
+    private function serializeRelationshipDeltas(array $deltas): array
+    {
+        $result = [];
+
+        foreach ($deltas as $delta) {
+            $result[] = [
+                'source_index' => $delta->sourceIndex,
+                'target_index' => $delta->targetIndex,
+                'trust_delta' => $delta->trustDelta,
+                'affinity_delta' => $delta->affinityDelta,
+                'respect_delta' => $delta->respectDelta,
+                'threat_delta' => $delta->threatDelta,
+            ];
+        }
+
+        return $result;
     }
 }
