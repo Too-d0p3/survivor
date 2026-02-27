@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Game;
 
 use App\Domain\Game\Enum\DayPhase;
+use App\Domain\Game\Enum\GameEventType;
 use App\Domain\User\User;
 use App\Dto\Game\CreateGameInput;
 use App\Dto\Game\ProcessTickInput;
@@ -147,6 +148,7 @@ final class GameController extends AbstractApiController
                 'dayPhase' => DayPhase::fromHour($tickCurrentHour)->value,
             ],
             'events' => $events,
+            'simulation' => $this->extractSimulationDebug($result->events),
         ]);
     }
 
@@ -183,6 +185,39 @@ final class GameController extends AbstractApiController
                 'offset' => $result->offset,
             ],
         ]);
+    }
+
+    /**
+     * @param array<int, GameEvent> $events
+     * @return array<string, mixed>|null
+     */
+    private function extractSimulationDebug(array $events): ?array
+    {
+        $tickSimEvent = null;
+        $perspectiveEvent = null;
+
+        foreach ($events as $event) {
+            if ($event->getType() === GameEventType::TickSimulation) {
+                $tickSimEvent = $event;
+            } elseif ($event->getType() === GameEventType::PlayerPerspective) {
+                $perspectiveEvent = $event;
+            }
+        }
+
+        if ($tickSimEvent === null) {
+            return null;
+        }
+
+        $metadata = $tickSimEvent->getMetadata() ?? [];
+
+        return [
+            'reasoning' => $metadata['reasoning'] ?? null,
+            'playerLocation' => $metadata['player_location'] ?? null,
+            'playersNearby' => $metadata['players_nearby'] ?? [],
+            'macroNarrative' => $tickSimEvent->getNarrative(),
+            'playerNarrative' => $perspectiveEvent?->getNarrative(),
+            'relationshipChanges' => $metadata['relationship_changes'] ?? [],
+        ];
     }
 
     /**

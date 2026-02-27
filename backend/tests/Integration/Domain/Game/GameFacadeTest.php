@@ -10,6 +10,7 @@ use App\Domain\Ai\Log\AiLog;
 use App\Domain\Ai\Result\AiResponse;
 use App\Domain\Ai\Result\TokenUsage;
 use App\Domain\Game\Enum\GameEventType;
+use App\Domain\Game\Exceptions\CannotProcessTickBecauseSimulationFailedException;
 use App\Domain\Game\Exceptions\CannotProcessTickBecauseUserIsNotPlayerException;
 use App\Domain\Game\Game;
 use App\Domain\Game\GameEvent;
@@ -19,6 +20,7 @@ use App\Domain\Relationship\Relationship;
 use App\Domain\TraitDef\TraitDef;
 use App\Domain\TraitDef\TraitType;
 use App\Tests\Integration\AbstractIntegrationTestCase;
+use RuntimeException;
 
 final class GameFacadeTest extends AbstractIntegrationTestCase
 {
@@ -226,6 +228,86 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
         self::assertSame(['action_text' => 'Went fishing'], $event->getMetadata());
     }
 
+    public function testProcessTickCreatesSimulationEvents(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $tickResult = $gameFacade->processTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $tickSimEvents = array_filter(
+            $tickResult->events,
+            static fn (GameEvent $e) => $e->getType() === GameEventType::TickSimulation,
+        );
+        self::assertCount(1, $tickSimEvents);
+
+        $perspectiveEvents = array_filter(
+            $tickResult->events,
+            static fn (GameEvent $e) => $e->getType() === GameEventType::PlayerPerspective,
+        );
+        self::assertCount(1, $perspectiveEvents);
+
+        $tickSimEvent = reset($tickSimEvents);
+        self::assertNull($tickSimEvent->getPlayer());
+        self::assertNotNull($tickSimEvent->getNarrative());
+
+        $perspectiveEvent = reset($perspectiveEvents);
+        self::assertNotNull($perspectiveEvent->getPlayer());
+        self::assertNotNull($perspectiveEvent->getNarrative());
+    }
+
+    public function testProcessTickAdjustsRelationships(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        // The mock simulation returns relationship changes for source_index=1, target_index=2
+        $gameFacade->processTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $relationshipRepository = $this->getEntityManager()->getRepository(Relationship::class);
+        $relationships = $relationshipRepository->findAll();
+
+        // Verify at least one relationship was updated (updatedAt changed)
+        $hasUpdated = false;
+        foreach ($relationships as $relationship) {
+            if ($relationship->getUpdatedAt() > $relationship->getCreatedAt()) {
+                $hasUpdated = true;
+
+                break;
+            }
+        }
+
+        self::assertTrue($hasUpdated, 'At least one relationship should have been updated by simulation');
+    }
+
+    public function testProcessTickPersistsSimulationAiLog(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $gameFacade->processTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $aiLogRepository = $this->getEntityManager()->getRepository(AiLog::class);
+        $logs = $aiLogRepository->findBy(['actionName' => 'simulateTick']);
+
+        self::assertCount(1, $logs);
+    }
+
     public function testProcessTickAdvancesGameTime(): void
     {
         $this->setUpMockGeminiClient();
@@ -274,6 +356,30 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
         self::assertSame(6, $foundGame->getCurrentHour());
     }
 
+    public function testProcessTickSimulationFailureThrowsExceptionAndPersistsLog(): void
+    {
+        $this->setUpFailingSimulationMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        try {
+            $gameFacade->processTick($createResult->game->getId(), $user, 'Went fishing');
+            self::fail('Expected CannotProcessTickBecauseSimulationFailedException');
+        } catch (CannotProcessTickBecauseSimulationFailedException) {
+            // Expected
+        }
+
+        // AI log should still be persisted even on failure
+        $aiLogRepository = $this->getEntityManager()->getRepository(AiLog::class);
+        $logs = $aiLogRepository->findBy(['actionName' => 'simulateTick']);
+
+        self::assertCount(1, $logs);
+    }
+
     public function testGetGameEventsReturnsPaginatedResults(): void
     {
         $this->setUpMockGeminiClient();
@@ -284,12 +390,12 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
         $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
         $gameFacade->startGame($createResult->game->getId(), $user);
         $gameFacade->processTick($createResult->game->getId(), $user, 'Action 1');
-        $gameFacade->processTick($createResult->game->getId(), $user, 'Action 2');
 
         $eventsResult = $gameFacade->getGameEvents($createResult->game->getId(), 2, 0);
 
         self::assertCount(2, $eventsResult->events);
-        self::assertSame(3, $eventsResult->totalCount);
+        // GameStarted (tick 0) + PlayerAction (tick 0) + TickSimulation (tick 0) + PlayerPerspective (tick 0) = 4 events
+        self::assertSame(4, $eventsResult->totalCount);
         self::assertSame(2, $eventsResult->limit);
         self::assertSame(0, $eventsResult->offset);
     }
@@ -334,7 +440,108 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
                     return $this->buildSummariesResponse();
                 }
 
-                return $this->buildRelationshipsResponse();
+                if ($this->callCount === 2) {
+                    return $this->buildRelationshipsResponse();
+                }
+
+                // All subsequent calls are simulation ticks
+                return $this->buildSimulationResponse();
+            }
+
+            private function buildSummariesResponse(): AiResponse
+            {
+                $summaries = [];
+                for ($i = 1; $i <= 5; $i++) {
+                    $summaries[] = ['player_index' => $i, 'summary' => "AI player {$i} summary."];
+                }
+
+                return new AiResponse(
+                    json_encode(['summaries' => $summaries], JSON_THROW_ON_ERROR),
+                    new TokenUsage(100, 50, 150),
+                    200,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+
+            private function buildRelationshipsResponse(): AiResponse
+            {
+                $relationships = [];
+                $playerCount = 6;
+
+                for ($source = 1; $source <= $playerCount; $source++) {
+                    for ($target = 1; $target <= $playerCount; $target++) {
+                        if ($source === $target) {
+                            continue;
+                        }
+
+                        $relationships[] = [
+                            'source_index' => $source,
+                            'target_index' => $target,
+                            'trust' => 40 + $source + $target,
+                            'affinity' => 45 + $source,
+                            'respect' => 50 + $target,
+                            'threat' => 30 + $source * 2,
+                        ];
+                    }
+                }
+
+                return new AiResponse(
+                    json_encode(['relationships' => $relationships], JSON_THROW_ON_ERROR),
+                    new TokenUsage(200, 100, 300),
+                    200,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+
+            private function buildSimulationResponse(): AiResponse
+            {
+                return new AiResponse(
+                    json_encode([
+                        'reasoning' => 'Hráči trávili čas na ostrově, diskutovali a sbírali zásoby.',
+                        'player_location' => 'pláž',
+                        'players_nearby' => [2, 3],
+                        'macro_narrative' => 'Human se vydal na pláž, kde potkal Alexe a Báru. Společně diskutovali o zásobách jídla. Cyril mezitím prozkoumával vnitrozemí ostrova a Dana s Emilem stavěli přístřešek.',
+                        'player_narrative' => 'Vydal ses na pláž, kde jsi potkal Alexe a Báru. Společně jste diskutovali o tom, jak rozdělit zásoby jídla.',
+                        'relationship_changes' => [
+                            ['source_index' => 1, 'target_index' => 2, 'trust_delta' => 3, 'affinity_delta' => 2, 'respect_delta' => 0, 'threat_delta' => 0],
+                            ['source_index' => 2, 'target_index' => 1, 'trust_delta' => 2, 'affinity_delta' => 1, 'respect_delta' => 1, 'threat_delta' => 0],
+                        ],
+                    ], JSON_THROW_ON_ERROR),
+                    new TokenUsage(300, 200, 500),
+                    300,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+        };
+
+        self::getContainer()->set(GeminiClient::class, $mockClient);
+    }
+
+    private function setUpFailingSimulationMockGeminiClient(): void
+    {
+        $mockClient = new class implements GeminiClient {
+            private int $callCount = 0;
+
+            public function request(AiRequest $aiRequest): AiResponse
+            {
+                $this->callCount++;
+
+                if ($this->callCount === 1) {
+                    return $this->buildSummariesResponse();
+                }
+
+                if ($this->callCount === 2) {
+                    return $this->buildRelationshipsResponse();
+                }
+
+                // Simulation calls fail with invalid JSON
+                throw new RuntimeException('AI service unavailable');
             }
 
             private function buildSummariesResponse(): AiResponse

@@ -185,7 +185,6 @@ final class GameControllerTest extends AbstractFunctionalTestCase
         /** @var GameFacade $gameFacade */
         $gameFacade = self::getContainer()->get(GameFacade::class);
         $gameFacade->processTick(Uuid::fromString($gameId), $user, 'Action 1');
-        $gameFacade->processTick(Uuid::fromString($gameId), $user, 'Action 2');
 
         $this->getBrowser()->loginUser($user);
         $this->getBrowser()->request('GET', "/api/game/{$gameId}/events?limit=2&offset=0");
@@ -203,9 +202,10 @@ final class GameControllerTest extends AbstractFunctionalTestCase
         self::assertIsArray($responseData['events']);
         self::assertCount(2, $responseData['events']);
 
+        // GameStarted + PlayerAction + TickSimulation + PlayerPerspective = 4 events
         /** @var array<string, mixed> $pagination */
         $pagination = $responseData['pagination'];
-        self::assertSame(3, $pagination['totalCount']);
+        self::assertSame(4, $pagination['totalCount']);
         self::assertSame(2, $pagination['limit']);
         self::assertSame(0, $pagination['offset']);
     }
@@ -262,7 +262,11 @@ final class GameControllerTest extends AbstractFunctionalTestCase
                     return $this->buildSummariesResponse();
                 }
 
-                return $this->buildRelationshipsResponse();
+                if ($this->callCount === 2) {
+                    return $this->buildRelationshipsResponse();
+                }
+
+                return $this->buildSimulationResponse();
             }
 
             private function buildSummariesResponse(): AiResponse
@@ -308,6 +312,27 @@ final class GameControllerTest extends AbstractFunctionalTestCase
                     json_encode(['relationships' => $relationships], JSON_THROW_ON_ERROR),
                     new TokenUsage(200, 100, 300),
                     200,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+
+            private function buildSimulationResponse(): AiResponse
+            {
+                return new AiResponse(
+                    json_encode([
+                        'reasoning' => 'Hráči trávili čas na ostrově a diskutovali.',
+                        'player_location' => 'pláž',
+                        'players_nearby' => [2, 3],
+                        'macro_narrative' => 'Hráč se vydal na pláž, kde potkal Alexe a Báru. Společně diskutovali o zásobách. Cyril prozkoumával vnitrozemí a Dana s Emilem stavěli přístřešek.',
+                        'player_narrative' => 'Vydal ses na pláž, kde jsi potkal Alexe a Báru. Společně jste diskutovali o zásobách jídla.',
+                        'relationship_changes' => [
+                            ['source_index' => 1, 'target_index' => 2, 'trust_delta' => 3, 'affinity_delta' => 2, 'respect_delta' => 0, 'threat_delta' => 0],
+                        ],
+                    ], JSON_THROW_ON_ERROR),
+                    new TokenUsage(300, 200, 500),
+                    300,
                     'gemini-2.5-flash',
                     '{"candidates": []}',
                     'STOP',

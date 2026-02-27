@@ -9,7 +9,6 @@ use App\Domain\Game\Exceptions\CannotDeleteGameBecauseUserIsNotOwnerException;
 use App\Domain\Game\Exceptions\CannotProcessTickBecauseGameIsNotInProgressException;
 use App\Domain\Game\Exceptions\CannotStartGameBecauseUserIsNotOwnerException;
 use App\Domain\Game\Result\CreateGameResult;
-use App\Domain\Game\Result\ProcessTickResult;
 use App\Domain\Game\Result\StartGameResult;
 use App\Domain\Player\Player;
 use App\Domain\Player\Trait\PlayerTrait;
@@ -94,13 +93,11 @@ final class GameService
     /**
      * @throws CannotProcessTickBecauseGameIsNotInProgressException
      */
-    public function processTick(Game $game, Player $humanPlayer, string $actionText, DateTimeImmutable $now): ProcessTickResult
+    public function createPlayerAction(Game $game, Player $humanPlayer, string $actionText, DateTimeImmutable $now): GameEvent
     {
         if ($game->getStatus() !== GameStatus::InProgress) {
             throw new CannotProcessTickBecauseGameIsNotInProgressException($game);
         }
-
-        $events = [];
 
         /** @var int $currentDay */
         $currentDay = $game->getCurrentDay();
@@ -109,7 +106,7 @@ final class GameService
         /** @var int $currentTick */
         $currentTick = $game->getCurrentTick();
 
-        $playerActionEvent = new GameEvent(
+        return new GameEvent(
             $game,
             GameEventType::PlayerAction,
             $currentDay,
@@ -120,11 +117,14 @@ final class GameService
             null,
             ['action_text' => $actionText],
         );
-        $events[] = $playerActionEvent;
+    }
 
-        // [FUTURE HOOK: AI player actions]
-        // [FUTURE HOOK: relationship updates]
-        // [FUTURE HOOK: narrative generation]
+    /**
+     * @return array<int, GameEvent>
+     */
+    public function advanceGameClock(Game $game, DateTimeImmutable $now): array
+    {
+        $events = [];
 
         $game->advanceTick();
 
@@ -147,7 +147,7 @@ final class GameService
             $game->sleepToNextDay();
         }
 
-        return new ProcessTickResult($game, $events);
+        return $events;
     }
 
     /**

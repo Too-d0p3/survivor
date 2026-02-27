@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Game;
 
 use App\Domain\Ai\Operation\PlayerRelationshipInput;
+use App\Domain\Game\Exceptions\CannotProcessTickBecauseSimulationFailedException;
 use App\Domain\Game\Exceptions\CannotProcessTickBecauseUserIsNotPlayerException;
 use App\Domain\Game\Result\CreateGameResult;
 use App\Domain\Game\Result\GameEventsResult;
@@ -13,6 +14,7 @@ use App\Domain\Game\Result\StartGameResult;
 use App\Domain\Player\Player;
 use App\Domain\Player\PlayerRepository;
 use App\Domain\Player\PlayerService;
+use App\Domain\Relationship\RelationshipRepository;
 use App\Domain\Relationship\RelationshipService;
 use App\Domain\TraitDef\TraitDefRepository;
 use App\Domain\User\User;
@@ -38,6 +40,12 @@ final class GameFacade
 
     private readonly TraitDefRepository $traitDefRepository;
 
+    private readonly SimulationAiService $simulationAiService;
+
+    private readonly SimulationService $simulationService;
+
+    private readonly RelationshipRepository $relationshipRepository;
+
     public function __construct(
         EntityManagerInterface $entityManager,
         GameService $gameService,
@@ -47,6 +55,9 @@ final class GameFacade
         PlayerRepository $playerRepository,
         RelationshipService $relationshipService,
         TraitDefRepository $traitDefRepository,
+        SimulationAiService $simulationAiService,
+        SimulationService $simulationService,
+        RelationshipRepository $relationshipRepository,
     ) {
         $this->entityManager = $entityManager;
         $this->gameService = $gameService;
@@ -56,6 +67,9 @@ final class GameFacade
         $this->playerRepository = $playerRepository;
         $this->relationshipService = $relationshipService;
         $this->traitDefRepository = $traitDefRepository;
+        $this->simulationAiService = $simulationAiService;
+        $this->simulationService = $simulationService;
+        $this->relationshipRepository = $relationshipRepository;
     }
 
     /**
@@ -168,15 +182,80 @@ final class GameFacade
             throw new CannotProcessTickBecauseUserIsNotPlayerException($game, $currentUser);
         }
 
-        $result = $this->gameService->processTick($game, $humanPlayer, $actionText, $now);
+        // 1. Save current day/hour/tick before any mutation
+        /** @var int $currentDay */
+        $currentDay = $game->getCurrentDay();
+        /** @var int $currentHour */
+        $currentHour = $game->getCurrentHour();
+        /** @var int $currentTick */
+        $currentTick = $game->getCurrentTick();
 
-        foreach ($result->events as $event) {
+        // 2. Create player action event
+        $playerActionEvent = $this->gameService->createPlayerAction($game, $humanPlayer, $actionText, $now);
+
+        // 3. Load context for simulation
+        $allPlayers = $game->getPlayers();
+        $allRelationships = $this->relationshipRepository->findByGame($game->getId());
+
+        // Last 3 ticks of events for context
+        $fromTick = max(0, $currentTick - 3);
+        $recentEvents = $this->gameEventRepository->findByGameFromTick($game->getId(), $fromTick);
+
+        // 4. Build simulation context DTOs
+        $playerInputs = SimulationContextBuilder::buildPlayerInputs($allPlayers);
+        $relationshipInputs = SimulationContextBuilder::buildRelationshipInputs($allRelationships, $allPlayers);
+        $eventInputs = SimulationContextBuilder::buildEventInputs($recentEvents, $allPlayers);
+        $humanPlayerIndex = SimulationContextBuilder::findHumanPlayerIndex($allPlayers);
+
+        // 5. Run AI simulation
+        $simulationServiceResult = $this->simulationAiService->simulateTick(
+            $currentDay,
+            $currentHour,
+            $actionText,
+            $playerInputs,
+            $relationshipInputs,
+            $eventInputs,
+            $humanPlayerIndex,
+            $now,
+        );
+
+        // 6. Always persist AI logs
+        foreach ($simulationServiceResult->getLogs() as $log) {
+            $this->entityManager->persist($log);
+        }
+
+        // 7. If AI failed, flush logs and throw
+        if (!$simulationServiceResult->isSuccess()) {
+            $this->entityManager->flush();
+
+            throw new CannotProcessTickBecauseSimulationFailedException($game, $simulationServiceResult->getError());
+        }
+
+        // 8. Apply simulation results (creates events, adjusts relationships)
+        $simulationResult = $this->simulationService->applySimulation(
+            $game,
+            $simulationServiceResult->getResult(),
+            $allPlayers,
+            $allRelationships,
+            $currentDay,
+            $currentHour,
+            $currentTick,
+            $now,
+        );
+
+        // 9. Advance game clock (may create NightSleep event)
+        $clockEvents = $this->gameService->advanceGameClock($game, $now);
+
+        // 10. Merge all events: player action + simulation + clock
+        $allEvents = array_merge([$playerActionEvent], $simulationResult->events, $clockEvents);
+
+        foreach ($allEvents as $event) {
             $this->entityManager->persist($event);
         }
 
         $this->entityManager->flush();
 
-        return $result;
+        return new ProcessTickResult($game, $allEvents);
     }
 
     public function getGameEvents(Uuid $gameId, int $limit, int $offset): GameEventsResult

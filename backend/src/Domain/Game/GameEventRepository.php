@@ -41,6 +41,24 @@ class GameEventRepository extends ServiceEntityRepository
         return $result;
     }
 
+    /**
+     * @return array<int, GameEvent>
+     */
+    public function findByGameFromTick(Uuid $gameId, int $fromTick): array
+    {
+        /** @var array<int, GameEvent> $result */
+        $result = $this->createQueryBuilder('gameEvent')
+            ->where('gameEvent.game = :gameId')
+            ->andWhere('gameEvent.tick >= :fromTick')
+            ->setParameter('gameId', $gameId)
+            ->setParameter('fromTick', $fromTick)
+            ->orderBy('gameEvent.tick', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $result;
+    }
+
     public function countByGame(Uuid $gameId): int
     {
         return (int) $this->createQueryBuilder('gameEvent')
