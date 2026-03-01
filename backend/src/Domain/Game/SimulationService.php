@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domain\Game;
 
+use App\Domain\Ai\Result\MajorEventData;
 use App\Domain\Ai\Result\RelationshipDelta;
 use App\Domain\Ai\Result\SimulateTickResult;
 use App\Domain\Game\Enum\GameEventType;
+use App\Domain\Game\Enum\MajorEventType;
+use App\Domain\Game\Enum\ParticipantRole;
 use App\Domain\Game\Result\ApplySimulationResult;
+use App\Domain\Game\Result\ExtractMajorEventsResult;
 use App\Domain\Player\Player;
 use App\Domain\Relationship\Relationship;
 use DateTimeImmutable;
@@ -81,6 +85,104 @@ final class SimulationService
         );
 
         return new ApplySimulationResult($events);
+    }
+
+    /**
+     * @param array<int, MajorEventData> $majorEventsData
+     * @param array<int, Player> $players 0-indexed
+     * @param array<string> $existingSummaries
+     */
+    public function extractMajorEvents(
+        Game $game,
+        GameEvent $sourceEvent,
+        array $majorEventsData,
+        array $players,
+        array $existingSummaries,
+        int $day,
+        int $hour,
+        int $tick,
+        DateTimeImmutable $now,
+    ): ExtractMajorEventsResult {
+        $playerByIndex = [];
+        foreach (array_values($players) as $i => $player) {
+            $playerByIndex[$i + 1] = $player;
+        }
+
+        $normalizedExisting = array_map(
+            static fn (string $s): string => mb_strtolower($s),
+            $existingSummaries,
+        );
+
+        $majorEvents = [];
+
+        foreach ($majorEventsData as $data) {
+            $type = MajorEventType::tryFrom($data->type);
+
+            if ($type === null) {
+                continue;
+            }
+
+            // Deduplication: skip if summary is substring of existing or vice versa
+            $normalizedSummary = mb_strtolower($data->summary);
+
+            if ($this->isDuplicateSummary($normalizedSummary, $normalizedExisting)) {
+                continue;
+            }
+
+            $majorEvent = new MajorEvent(
+                $game,
+                $sourceEvent,
+                $type,
+                $data->summary,
+                $data->emotionalWeight,
+                $day,
+                $hour,
+                $tick,
+                $now,
+            );
+
+            $hasValidParticipant = false;
+
+            foreach ($data->participants as $participantData) {
+                $player = $playerByIndex[$participantData->playerIndex] ?? null;
+
+                if ($player === null) {
+                    continue;
+                }
+
+                $role = ParticipantRole::tryFrom($participantData->role);
+
+                if ($role === null) {
+                    continue;
+                }
+
+                $participant = new MajorEventParticipant($majorEvent, $player, $role);
+                $majorEvent->addParticipant($participant);
+                $hasValidParticipant = true;
+            }
+
+            if (!$hasValidParticipant) {
+                continue;
+            }
+
+            $majorEvents[] = $majorEvent;
+        }
+
+        return new ExtractMajorEventsResult($majorEvents);
+    }
+
+    /**
+     * @param array<string> $normalizedExisting
+     */
+    private function isDuplicateSummary(string $normalizedSummary, array $normalizedExisting): bool
+    {
+        foreach ($normalizedExisting as $existing) {
+            if (str_contains($existing, $normalizedSummary) || str_contains($normalizedSummary, $existing)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -12,6 +12,7 @@ Tvým úkolem je simulovat, co se stalo na ostrově během tohoto časového ús
 4. **macro_narrative** — Napiš narativ o VŠECH hráčích ve 3. osobě, minulý čas, 400–800 znaků, česky.
 5. **player_narrative** — Napiš narativ POUZE z pohledu lidského hráče, 2. osoba ("viděl jsi", "slyšel jsi"), minulý čas, 200–400 znaků, česky. Zahrň POUZE to, co hráč mohl vidět nebo slyšet — tedy POUZE interakce s hráči z players_nearby.
 6. **relationship_changes** — Urči změny ve vztazích POUZE pro páry hráčů, kteří spolu přímo interagovali v macro_narrative.
+7. **major_events** — Identifikuj klíčové události z tohoto ticku hodné dlouhodobého záznamu. Výchozí hodnota je prázdné pole [] — použij ji u běžných ticků bez výjimečných momentů.
 
 ## Pravidla pro relationship_changes
 
@@ -72,6 +73,38 @@ Následující rozsahy jsou MAXIMÁLNÍ povolené hodnoty:
 - Hráč s `witty` > 0.6 vtip na úkor někoho → affinity -3 až -5
 - Hráč s `empathetic` > 0.7 podpoří v těžké situaci → affinity +5 až +8
 - Hráč s `strategic` > 0.7 navrhne alianci → u NAVRHOVATELE: trust +3 až +5, threat +2 až +4. U PŘÍJEMCE: trust +3 až +5, threat -2 až -4.
+
+## Pravidla pro major_events
+
+Major events jsou klíčové události hodné dlouhodobého záznamu v paměti hráčů. Většina ticků **NEMÁ žádné** major events — vrať prázdné pole [].
+
+**Co JE major event:**
+- Zrada spojence nebo porušení slibu
+- Vytvoření nebo rozpad aliance
+- Přímá konfrontace s důsledky (hádka, obvinění, ultimátum)
+- Odhalení tajemství nebo důležité informace
+- Sebeobětování nebo nečekaná pomoc
+- Úspěšná manipulace s viditelným dopadem
+
+**Co NENÍ major event (NEZAHRNUJ):**
+- Běžné rozhovory, small talk, sdílení jídla
+- Slabé sympatie nebo antipatie bez konkrétní akce
+- Nerealizované plány nebo záměry
+- Události již zachycené v PAMĚŤ HRÁČŮ — nevytvářej duplicitu
+
+**Limity:**
+- 0–3 položky na tick. Prázdné pole [] je preferovaná výchozí hodnota.
+- summary: česky, 3. osoba, minulý čas, max 200 znaků. Bez hodnotících přídavných jmen.
+- emotional_weight: Vyšší hodnota = trvalejší vzpomínka v paměti hráčů. Rezervuj 8–10 pro skutečně zlomové momenty. Škála: 1–3 drobná, 4–5 významná, 6–7 závažná (jednorázová zrada, ostrá konfrontace), 8–9 zásadní (rozpad klíčové aliance, veřejné ponížení), 10 zlomová událost hry (extrémně vzácné).
+- type: betrayal, alliance, conflict, revelation, sacrifice, manipulation, other.
+- Pokud vygeneruješ major_event, ověř, že odpovídající relationship_changes pro přímé účastníky existují. Aliance bez změny trust, nebo konflikt bez změny affinity, je nekonzistentní.
+- Pokud z jedné interakce vzejde více událostí, zahrň pouze tu nejzávažnější. Nezachycuj přímé důsledky jako samostatné události.
+
+**Účastníci (participants):**
+- Každý účastník má player_index (1-based) a role (initiator, target, witness).
+- Zahrň VŠECHNY hráče přímo zapojené do události — u hromadných akcí (urážka celé skupiny, projev k celému kmeni) jsou VŠICHNI zasažení hráči "target", ne jen jeden.
+- Lidský hráč MŮŽE být účastníkem, pokud se aktivně účastnil události.
+- witness = hráč, který byl fyzicky přítomen a událost viděl/slyšel, ale nebyl jejím přímým objektem ani iniciátorem. Pokud byli všichni přítomní přímo zasaženi (např. urážka celé skupiny), jsou target, ne witness.
 
 ## Formát odpovědi
 

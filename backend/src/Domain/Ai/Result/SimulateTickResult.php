@@ -20,9 +20,13 @@ final readonly class SimulateTickResult
     /** @var array<int, RelationshipDelta> */
     private array $relationshipChanges;
 
+    /** @var array<int, MajorEventData> */
+    private array $majorEvents;
+
     /**
      * @param array<int, int> $playersNearby
      * @param array<int, RelationshipDelta> $relationshipChanges
+     * @param array<int, MajorEventData> $majorEvents
      */
     public function __construct(
         string $reasoning,
@@ -31,6 +35,7 @@ final readonly class SimulateTickResult
         string $macroNarrative,
         string $playerNarrative,
         array $relationshipChanges,
+        array $majorEvents = [],
     ) {
         $this->reasoning = $reasoning;
         $this->playerLocation = $playerLocation;
@@ -38,6 +43,7 @@ final readonly class SimulateTickResult
         $this->macroNarrative = $macroNarrative;
         $this->playerNarrative = $playerNarrative;
         $this->relationshipChanges = $relationshipChanges;
+        $this->majorEvents = $majorEvents;
     }
 
     public function getReasoning(): string
@@ -74,5 +80,13 @@ final readonly class SimulateTickResult
     public function getRelationshipChanges(): array
     {
         return $this->relationshipChanges;
+    }
+
+    /**
+     * @return array<int, MajorEventData>
+     */
+    public function getMajorEvents(): array
+    {
+        return $this->majorEvents;
     }
 }

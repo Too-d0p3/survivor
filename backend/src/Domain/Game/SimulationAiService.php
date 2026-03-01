@@ -7,6 +7,7 @@ namespace App\Domain\Game;
 use App\Domain\Ai\AiExecutor;
 use App\Domain\Ai\Operation\SimulateTickOperation;
 use App\Domain\Ai\Operation\SimulationEventInput;
+use App\Domain\Ai\Operation\SimulationMemoryInput;
 use App\Domain\Ai\Operation\SimulationPlayerInput;
 use App\Domain\Ai\Operation\SimulationRelationshipInput;
 use App\Domain\Ai\Result\SimulateTickServiceResult;
@@ -25,6 +26,7 @@ final readonly class SimulationAiService
      * @param array<int, SimulationPlayerInput> $players
      * @param array<int, SimulationRelationshipInput> $relationships
      * @param array<int, SimulationEventInput> $recentEvents
+     * @param array<int, SimulationMemoryInput> $memories
      */
     public function simulateTick(
         int $day,
@@ -35,6 +37,7 @@ final readonly class SimulationAiService
         array $recentEvents,
         int $humanPlayerIndex,
         DateTimeImmutable $now,
+        array $memories = [],
     ): SimulateTickServiceResult {
         $operation = new SimulateTickOperation(
             $day,
@@ -44,6 +47,7 @@ final readonly class SimulationAiService
             $relationships,
             $recentEvents,
             $humanPlayerIndex,
+            $memories,
         );
 
         $callResult = $this->executor->execute($operation, $now);

@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Domain\Game;
 
+use App\Domain\Ai\Result\MajorEventData;
+use App\Domain\Ai\Result\MajorEventParticipantData;
 use App\Domain\Ai\Result\RelationshipDelta;
 use App\Domain\Ai\Result\SimulateTickResult;
 use App\Domain\Game\Enum\GameEventType;
+use App\Domain\Game\Enum\MajorEventType;
+use App\Domain\Game\Enum\ParticipantRole;
 use App\Domain\Game\Game;
+use App\Domain\Game\GameEvent;
 use App\Domain\Game\GameStatus;
 use App\Domain\Game\SimulationService;
 use App\Domain\Player\Player;
@@ -197,9 +202,174 @@ final class SimulationServiceTest extends TestCase
         self::assertSame(50, $relationship->getTrust());
     }
 
+    public function testExtractMajorEventsHappyPath(): void
+    {
+        $game = $this->createStartedGame();
+        $players = $this->createPlayers($game);
+        $sourceEvent = $this->createSourceEvent($game);
+        $now = new DateTimeImmutable();
+
+        $majorEventsData = [
+            new MajorEventData(
+                'alliance',
+                'Alex a Bara uzavřeli alianci.',
+                7,
+                [
+                    new MajorEventParticipantData(2, 'initiator'),
+                    new MajorEventParticipantData(3, 'target'),
+                ],
+            ),
+        ];
+
+        $result = $this->service->extractMajorEvents($game, $sourceEvent, $majorEventsData, $players, [], 1, 8, 1, $now);
+
+        self::assertCount(1, $result->majorEvents);
+        $majorEvent = $result->majorEvents[0];
+        self::assertSame(MajorEventType::Alliance, $majorEvent->getType());
+        self::assertSame('Alex a Bara uzavřeli alianci.', $majorEvent->getSummary());
+        self::assertSame(7, $majorEvent->getEmotionalWeight());
+        self::assertCount(2, $majorEvent->getParticipants());
+        self::assertSame($players[1], $majorEvent->getParticipants()[0]->getPlayer());
+        self::assertSame(ParticipantRole::Initiator, $majorEvent->getParticipants()[0]->getRole());
+        self::assertSame($players[2], $majorEvent->getParticipants()[1]->getPlayer());
+        self::assertSame(ParticipantRole::Target, $majorEvent->getParticipants()[1]->getRole());
+    }
+
+    public function testExtractMajorEventsInvalidTypeSkipped(): void
+    {
+        $game = $this->createStartedGame();
+        $players = $this->createPlayers($game);
+        $sourceEvent = $this->createSourceEvent($game);
+        $now = new DateTimeImmutable();
+
+        $majorEventsData = [
+            new MajorEventData(
+                'invalid_type',
+                'Neznámá událost.',
+                5,
+                [new MajorEventParticipantData(2, 'initiator')],
+            ),
+        ];
+
+        $result = $this->service->extractMajorEvents($game, $sourceEvent, $majorEventsData, $players, [], 1, 8, 1, $now);
+
+        self::assertSame([], $result->majorEvents);
+    }
+
+    public function testExtractMajorEventsInvalidPlayerIndexSkipped(): void
+    {
+        $game = $this->createStartedGame();
+        $players = $this->createPlayers($game);
+        $sourceEvent = $this->createSourceEvent($game);
+        $now = new DateTimeImmutable();
+
+        $majorEventsData = [
+            new MajorEventData(
+                'conflict',
+                'Konflikt.',
+                5,
+                [
+                    new MajorEventParticipantData(99, 'initiator'),
+                    new MajorEventParticipantData(2, 'target'),
+                ],
+            ),
+        ];
+
+        $result = $this->service->extractMajorEvents($game, $sourceEvent, $majorEventsData, $players, [], 1, 8, 1, $now);
+
+        // Event kept, but only the valid participant (player index 2)
+        self::assertCount(1, $result->majorEvents);
+        self::assertCount(1, $result->majorEvents[0]->getParticipants());
+        self::assertSame($players[1], $result->majorEvents[0]->getParticipants()[0]->getPlayer());
+    }
+
+    public function testExtractMajorEventsAllParticipantsInvalidSkipsEvent(): void
+    {
+        $game = $this->createStartedGame();
+        $players = $this->createPlayers($game);
+        $sourceEvent = $this->createSourceEvent($game);
+        $now = new DateTimeImmutable();
+
+        $majorEventsData = [
+            new MajorEventData(
+                'conflict',
+                'Konflikt.',
+                5,
+                [
+                    new MajorEventParticipantData(99, 'initiator'),
+                    new MajorEventParticipantData(100, 'target'),
+                ],
+            ),
+        ];
+
+        $result = $this->service->extractMajorEvents($game, $sourceEvent, $majorEventsData, $players, [], 1, 8, 1, $now);
+
+        self::assertSame([], $result->majorEvents);
+    }
+
+    public function testExtractMajorEventsDuplicateSummarySkipped(): void
+    {
+        $game = $this->createStartedGame();
+        $players = $this->createPlayers($game);
+        $sourceEvent = $this->createSourceEvent($game);
+        $now = new DateTimeImmutable();
+
+        $majorEventsData = [
+            new MajorEventData(
+                'alliance',
+                'Alex a Bara uzavřeli alianci',
+                7,
+                [new MajorEventParticipantData(2, 'initiator')],
+            ),
+        ];
+
+        // Existing summary is a superstring of the new summary (contains it)
+        $existingSummaries = ['Alex a Bara uzavřeli alianci pro hlasování'];
+
+        $result = $this->service->extractMajorEvents($game, $sourceEvent, $majorEventsData, $players, $existingSummaries, 1, 8, 1, $now);
+
+        self::assertSame([], $result->majorEvents);
+    }
+
+    public function testExtractMajorEventsClampingAndTruncation(): void
+    {
+        $game = $this->createStartedGame();
+        $players = $this->createPlayers($game);
+        $sourceEvent = $this->createSourceEvent($game);
+        $now = new DateTimeImmutable();
+        $longSummary = str_repeat('z', 250);
+
+        $majorEventsData = [
+            new MajorEventData(
+                'other',
+                $longSummary,
+                15,
+                [new MajorEventParticipantData(2, 'witness')],
+            ),
+        ];
+
+        $result = $this->service->extractMajorEvents($game, $sourceEvent, $majorEventsData, $players, [], 1, 8, 1, $now);
+
+        self::assertCount(1, $result->majorEvents);
+        self::assertSame(200, mb_strlen($result->majorEvents[0]->getSummary()));
+        self::assertSame(10, $result->majorEvents[0]->getEmotionalWeight());
+    }
+
     protected function setUp(): void
     {
         $this->service = new SimulationService();
+    }
+
+    private function createSourceEvent(Game $game): GameEvent
+    {
+        return new GameEvent(
+            $game,
+            GameEventType::TickSimulation,
+            1,
+            8,
+            1,
+            new DateTimeImmutable(),
+        );
     }
 
     private function createStartedGame(): Game

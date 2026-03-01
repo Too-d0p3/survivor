@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Domain\Ai\Operation;
 use App\Domain\Ai\Exceptions\AiResponseParsingFailedException;
 use App\Domain\Ai\Operation\SimulateTickOperation;
 use App\Domain\Ai\Operation\SimulationEventInput;
+use App\Domain\Ai\Operation\SimulationMemoryInput;
 use App\Domain\Ai\Operation\SimulationPlayerInput;
 use App\Domain\Ai\Operation\SimulationRelationshipInput;
 use InvalidArgumentException;
@@ -49,7 +50,7 @@ final class SimulateTickOperationTest extends TestCase
 
         self::assertSame('object', $schema->getType());
         self::assertSame(
-            ['reasoning', 'player_location', 'players_nearby', 'macro_narrative', 'player_narrative', 'relationship_changes'],
+            ['reasoning', 'player_location', 'players_nearby', 'macro_narrative', 'player_narrative', 'relationship_changes', 'major_events'],
             $schema->getRequired(),
         );
     }
@@ -627,6 +628,359 @@ final class SimulateTickOperationTest extends TestCase
         self::assertNotFalse($backstagePos);
         self::assertNotFalse($humanActionPos);
         self::assertLessThan($humanActionPos, $backstagePos);
+    }
+
+    public function testParseMajorEventsHappyPath(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [2],
+            'macro_narrative' => 'Hráči diskutovali o strategii.',
+            'player_narrative' => 'Potkal jsi Alexe.',
+            'relationship_changes' => [],
+            'major_events' => [
+                [
+                    'type' => 'alliance',
+                    'summary' => 'Alex a Bara uzavřeli alianci.',
+                    'emotional_weight' => 7,
+                    'participants' => [
+                        ['player_index' => 2, 'role' => 'initiator'],
+                        ['player_index' => 3, 'role' => 'target'],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        self::assertCount(1, $result->getMajorEvents());
+        $event = $result->getMajorEvents()[0];
+        self::assertSame('alliance', $event->type);
+        self::assertSame('Alex a Bara uzavřeli alianci.', $event->summary);
+        self::assertSame(7, $event->emotionalWeight);
+        self::assertCount(2, $event->participants);
+        self::assertSame(2, $event->participants[0]->playerIndex);
+        self::assertSame('initiator', $event->participants[0]->role);
+        self::assertSame(3, $event->participants[1]->playerIndex);
+        self::assertSame('target', $event->participants[1]->role);
+    }
+
+    public function testParseMajorEventsEmptyArray(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [],
+            'macro_narrative' => 'Klidný den na ostrově.',
+            'player_narrative' => 'Relaxoval jsi na pláži.',
+            'relationship_changes' => [],
+            'major_events' => [],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        self::assertSame([], $result->getMajorEvents());
+    }
+
+    public function testParseMajorEventsMissingKey(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [],
+            'macro_narrative' => 'Klidný den na ostrově.',
+            'player_narrative' => 'Relaxoval jsi na pláži.',
+            'relationship_changes' => [],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        self::assertSame([], $result->getMajorEvents());
+    }
+
+    public function testParseMajorEventsInvalidItems(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [],
+            'macro_narrative' => 'Klidný den.',
+            'player_narrative' => 'Relaxoval jsi.',
+            'relationship_changes' => [],
+            'major_events' => [
+                'not_an_array',
+                ['missing_type' => true, 'summary' => 'test', 'emotional_weight' => 5, 'participants' => [['player_index' => 2, 'role' => 'initiator']]],
+                ['type' => 'alliance', 'missing_summary' => true, 'emotional_weight' => 5, 'participants' => [['player_index' => 2, 'role' => 'initiator']]],
+                ['type' => 'alliance', 'summary' => 'test', 'missing_weight' => true, 'participants' => [['player_index' => 2, 'role' => 'initiator']]],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        self::assertSame([], $result->getMajorEvents());
+    }
+
+    public function testParseMajorEventsExceedsMaxTruncatedTo3(): void
+    {
+        $operation = $this->createOperation();
+
+        $events = [];
+        for ($i = 0; $i < 6; $i++) {
+            $events[] = [
+                'type' => 'conflict',
+                'summary' => "Konflikt číslo {$i}.",
+                'emotional_weight' => 5,
+                'participants' => [
+                    ['player_index' => 2, 'role' => 'initiator'],
+                ],
+            ];
+        }
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [],
+            'macro_narrative' => 'Dramatický den na ostrově.',
+            'player_narrative' => 'Bylo plno konfliktů.',
+            'relationship_changes' => [],
+            'major_events' => $events,
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        self::assertCount(3, $result->getMajorEvents());
+    }
+
+    public function testParseMajorEventsEmotionalWeightClamping(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [],
+            'macro_narrative' => 'Dramatický den.',
+            'player_narrative' => 'Přežil jsi.',
+            'relationship_changes' => [],
+            'major_events' => [
+                [
+                    'type' => 'conflict',
+                    'summary' => 'Malý konflikt.',
+                    'emotional_weight' => 0,
+                    'participants' => [['player_index' => 2, 'role' => 'initiator']],
+                ],
+                [
+                    'type' => 'betrayal',
+                    'summary' => 'Velká zrada.',
+                    'emotional_weight' => 11,
+                    'participants' => [['player_index' => 3, 'role' => 'target']],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        self::assertCount(2, $result->getMajorEvents());
+        self::assertSame(1, $result->getMajorEvents()[0]->emotionalWeight);
+        self::assertSame(10, $result->getMajorEvents()[1]->emotionalWeight);
+    }
+
+    public function testParseMajorEventsSummaryTruncation(): void
+    {
+        $operation = $this->createOperation();
+        $longSummary = str_repeat('x', 250);
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [],
+            'macro_narrative' => 'Dramatický den.',
+            'player_narrative' => 'Přežil jsi.',
+            'relationship_changes' => [],
+            'major_events' => [
+                [
+                    'type' => 'other',
+                    'summary' => $longSummary,
+                    'emotional_weight' => 5,
+                    'participants' => [['player_index' => 2, 'role' => 'witness']],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        self::assertCount(1, $result->getMajorEvents());
+        self::assertSame(200, mb_strlen($result->getMajorEvents()[0]->summary));
+    }
+
+    public function testParseMajorEventsInvalidPlayerIndex(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [],
+            'macro_narrative' => 'Dramatický den.',
+            'player_narrative' => 'Přežil jsi.',
+            'relationship_changes' => [],
+            'major_events' => [
+                [
+                    'type' => 'conflict',
+                    'summary' => 'Konflikt.',
+                    'emotional_weight' => 5,
+                    'participants' => [
+                        ['player_index' => 99, 'role' => 'initiator'],
+                        ['player_index' => 2, 'role' => 'target'],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        // Event should be kept with only the valid participant
+        self::assertCount(1, $result->getMajorEvents());
+        self::assertCount(1, $result->getMajorEvents()[0]->participants);
+        self::assertSame(2, $result->getMajorEvents()[0]->participants[0]->playerIndex);
+    }
+
+    public function testParseMajorEventsNoValidParticipants(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [],
+            'macro_narrative' => 'Dramatický den.',
+            'player_narrative' => 'Přežil jsi.',
+            'relationship_changes' => [],
+            'major_events' => [
+                [
+                    'type' => 'conflict',
+                    'summary' => 'Konflikt.',
+                    'emotional_weight' => 5,
+                    'participants' => [
+                        ['player_index' => 99, 'role' => 'initiator'],
+                        ['player_index' => 0, 'role' => 'target'],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        // Event skipped because no valid participants
+        self::assertSame([], $result->getMajorEvents());
+    }
+
+    public function testParseMajorEventsDeduplicatesParticipantsByPlayerIndex(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [],
+            'macro_narrative' => 'Dramatický den.',
+            'player_narrative' => 'Přežil jsi.',
+            'relationship_changes' => [],
+            'major_events' => [
+                [
+                    'type' => 'conflict',
+                    'summary' => 'Konflikt.',
+                    'emotional_weight' => 5,
+                    'participants' => [
+                        ['player_index' => 2, 'role' => 'initiator'],
+                        ['player_index' => 2, 'role' => 'target'],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        // Only first occurrence of player_index=2 should be kept
+        self::assertCount(1, $result->getMajorEvents());
+        self::assertCount(1, $result->getMajorEvents()[0]->participants);
+        self::assertSame('initiator', $result->getMajorEvents()[0]->participants[0]->role);
+    }
+
+    public function testFormatMessageContainsMemorySectionWithMemories(): void
+    {
+        $memories = [
+            new SimulationMemoryInput(2, 1, 8, 'alliance', 'Alex a Bara uzavřeli alianci.', 7, 'iniciátor'),
+            new SimulationMemoryInput(3, 1, 10, 'conflict', 'Cyril měl konflikt s Danou.', 5, 'svědek'),
+        ];
+
+        $operation = new SimulateTickOperation(
+            2,
+            10,
+            'Jdu se napít',
+            $this->createPlayers(3),
+            [],
+            [],
+            1,
+            $memories,
+        );
+
+        $message = $operation->formatMessage();
+
+        self::assertStringContainsString('=== PAMĚŤ HRÁČŮ ===', $message);
+        self::assertStringContainsString('Hráč 2 (Alex) si pamatuje:', $message);
+        self::assertStringContainsString('Alex a Bara uzavřeli alianci.', $message);
+        self::assertStringContainsString('role: iniciátor', $message);
+        self::assertStringContainsString('závažnost: 7', $message);
+    }
+
+    public function testFormatMessageContainsEmptyMemorySection(): void
+    {
+        $operation = $this->createOperation();
+
+        $message = $operation->formatMessage();
+
+        self::assertStringContainsString('=== PAMĚŤ HRÁČŮ ===', $message);
+        self::assertStringContainsString('hra právě začala', $message);
+    }
+
+    public function testFormatMessageMemorySectionBeforeRecentEvents(): void
+    {
+        $memories = [
+            new SimulationMemoryInput(2, 1, 8, 'alliance', 'Aliance.', 6, 'iniciátor'),
+        ];
+        $events = [
+            new SimulationEventInput(1, 6, 'game_started', null, 'Hra začala.', null),
+        ];
+
+        $operation = new SimulateTickOperation(
+            2,
+            10,
+            'Jdu se napít',
+            $this->createPlayers(3),
+            [],
+            $events,
+            1,
+            $memories,
+        );
+
+        $message = $operation->formatMessage();
+
+        $memoryPos = strpos($message, '=== PAMĚŤ HRÁČŮ ===');
+        $eventsPos = strpos($message, '=== NEDÁVNÉ UDÁLOSTI ===');
+
+        self::assertNotFalse($memoryPos);
+        self::assertNotFalse($eventsPos);
+        self::assertLessThan($eventsPos, $memoryPos);
     }
 
     private function createOperation(): SimulateTickOperation

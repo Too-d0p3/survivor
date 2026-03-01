@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Game;
 
+use App\Domain\Ai\Result\MajorEventData;
 use App\Domain\Ai\Result\RelationshipDelta;
 use App\Domain\Game\Enum\DayPhase;
 use App\Domain\Game\Enum\GameEventType;
@@ -198,6 +199,7 @@ final class GameController extends AbstractApiController
                 'macroNarrative' => $simulation->getMacroNarrative(),
                 'playerNarrative' => $simulation->getPlayerNarrative(),
                 'relationshipChanges' => $this->serializeRelationshipDeltas($simulation->getRelationshipChanges()),
+                'majorEvents' => $this->serializeMajorEvents($simulation->getMajorEvents()),
             ],
         ]);
     }
@@ -306,6 +308,34 @@ final class GameController extends AbstractApiController
                 'affinity_delta' => $delta->affinityDelta,
                 'respect_delta' => $delta->respectDelta,
                 'threat_delta' => $delta->threatDelta,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<int, MajorEventData> $majorEvents
+     * @return array<int, array<string, mixed>>
+     */
+    private function serializeMajorEvents(array $majorEvents): array
+    {
+        $result = [];
+
+        foreach ($majorEvents as $event) {
+            $participants = [];
+            foreach ($event->participants as $participant) {
+                $participants[] = [
+                    'player_index' => $participant->playerIndex,
+                    'role' => $participant->role,
+                ];
+            }
+
+            $result[] = [
+                'type' => $event->type,
+                'summary' => $event->summary,
+                'emotional_weight' => $event->emotionalWeight,
+                'participants' => $participants,
             ];
         }
 

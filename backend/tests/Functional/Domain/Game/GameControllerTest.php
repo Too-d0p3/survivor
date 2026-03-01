@@ -256,6 +256,8 @@ final class GameControllerTest extends AbstractFunctionalTestCase
         self::assertArrayHasKey('macroNarrative', $simulation);
         self::assertArrayHasKey('playerNarrative', $simulation);
         self::assertArrayHasKey('relationshipChanges', $simulation);
+        self::assertArrayHasKey('majorEvents', $simulation);
+        self::assertIsArray($simulation['majorEvents']);
         self::assertNotEmpty($simulation['reasoning']);
         self::assertNotEmpty($simulation['macroNarrative']);
     }

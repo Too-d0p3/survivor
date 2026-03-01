@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Domain\Game;
 
 use App\Domain\Ai\Operation\SimulationEventInput;
+use App\Domain\Ai\Operation\SimulationMemoryInput;
 use App\Domain\Ai\Operation\SimulationPlayerInput;
 use App\Domain\Ai\Operation\SimulationRelationshipInput;
 use App\Domain\Game\Enum\GameEventType;
+use App\Domain\Game\Enum\ParticipantRole;
 use App\Domain\Player\Player;
 use App\Domain\Relationship\Relationship;
 
@@ -135,5 +137,61 @@ final class SimulationContextBuilder
         }
 
         return 1;
+    }
+
+    /**
+     * @param array<int, array<int, MajorEvent>> $majorEventsByPlayerIndex playerIndex => MajorEvent[]
+     * @param array<int, Player> $players
+     * @return array<int, SimulationMemoryInput>
+     */
+    public static function buildMemoryInputs(array $majorEventsByPlayerIndex, array $players): array
+    {
+        $playerIndexMap = [];
+        foreach (array_values($players) as $i => $player) {
+            $playerIndexMap[$player->getId()->toString()] = $i + 1;
+        }
+
+        $roleLabels = [
+            ParticipantRole::Initiator->value => 'iniciátor',
+            ParticipantRole::Target->value => 'oběť',
+            ParticipantRole::Witness->value => 'svědek',
+        ];
+
+        $inputs = [];
+
+        foreach ($majorEventsByPlayerIndex as $playerIndex => $majorEvents) {
+            foreach ($majorEvents as $majorEvent) {
+                $role = self::findPlayerRoleInEvent($majorEvent, $playerIndex, $playerIndexMap);
+                $roleLabel = $role !== null ? $roleLabels[$role->value] : 'účastník';
+
+                $inputs[] = new SimulationMemoryInput(
+                    $playerIndex,
+                    $majorEvent->getDay(),
+                    $majorEvent->getHour(),
+                    $majorEvent->getType()->value,
+                    $majorEvent->getSummary(),
+                    $majorEvent->getEmotionalWeight(),
+                    $roleLabel,
+                );
+            }
+        }
+
+        return $inputs;
+    }
+
+    /**
+     * @param array<string, int> $playerIndexMap playerId => 1-based index
+     */
+    private static function findPlayerRoleInEvent(MajorEvent $majorEvent, int $playerIndex, array $playerIndexMap): ?ParticipantRole
+    {
+        foreach ($majorEvent->getParticipants() as $participant) {
+            $participantIndex = $playerIndexMap[$participant->getPlayer()->getId()->toString()] ?? null;
+
+            if ($participantIndex === $playerIndex) {
+                return $participant->getRole();
+            }
+        }
+
+        return null;
     }
 }

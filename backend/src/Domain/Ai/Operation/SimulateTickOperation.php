@@ -7,6 +7,8 @@ namespace App\Domain\Ai\Operation;
 use App\Domain\Ai\Dto\AiMessage;
 use App\Domain\Ai\Dto\AiResponseSchema;
 use App\Domain\Ai\Exceptions\AiResponseParsingFailedException;
+use App\Domain\Ai\Result\MajorEventData;
+use App\Domain\Ai\Result\MajorEventParticipantData;
 use App\Domain\Ai\Result\RelationshipDelta;
 use App\Domain\Ai\Result\SimulateTickResult;
 use App\Domain\Game\Enum\DayPhase;
@@ -24,6 +26,10 @@ final readonly class SimulateTickOperation implements AiOperation
     private const int MAX_PLAYER_LOCATION_LENGTH = 80;
     private const int MAX_MACRO_NARRATIVE_LENGTH = 900;
     private const int MAX_PLAYER_NARRATIVE_LENGTH = 500;
+    private const int MAX_MAJOR_EVENTS = 3;
+    private const int MAX_MAJOR_EVENT_SUMMARY_LENGTH = 200;
+    private const int MIN_EMOTIONAL_WEIGHT = 1;
+    private const int MAX_EMOTIONAL_WEIGHT = 10;
     private const int BACKSTAGE_HIGH_THREAT_THRESHOLD = 60;
     private const int BACKSTAGE_LOW_TRUST_THRESHOLD = 30;
     private const int BACKSTAGE_MUTUAL_HIGH_TRUST_THRESHOLD = 70;
@@ -49,10 +55,14 @@ final readonly class SimulateTickOperation implements AiOperation
 
     private int $humanPlayerIndex;
 
+    /** @var array<int, SimulationMemoryInput> */
+    private array $memories;
+
     /**
      * @param array<int, SimulationPlayerInput> $players
      * @param array<int, SimulationRelationshipInput> $relationships
      * @param array<int, SimulationEventInput> $recentEvents
+     * @param array<int, SimulationMemoryInput> $memories
      */
     public function __construct(
         int $day,
@@ -62,6 +72,7 @@ final readonly class SimulateTickOperation implements AiOperation
         array $relationships,
         array $recentEvents,
         int $humanPlayerIndex,
+        array $memories = [],
     ) {
         if (count($players) < 2) {
             throw new InvalidArgumentException('At least 2 players are required');
@@ -78,6 +89,7 @@ final readonly class SimulateTickOperation implements AiOperation
         $this->relationships = $relationships;
         $this->recentEvents = $recentEvents;
         $this->humanPlayerIndex = $humanPlayerIndex;
+        $this->memories = $memories;
     }
 
     public function getActionName(): string
@@ -147,8 +159,32 @@ final readonly class SimulateTickOperation implements AiOperation
                         'required' => ['source_index', 'target_index', 'trust_delta', 'affinity_delta', 'respect_delta', 'threat_delta'],
                     ],
                 ],
+                'major_events' => [
+                    'type' => 'array',
+                    'description' => 'Klíčové události tohoto ticku (0-3 položky, může být prázdné pole)',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'type' => ['type' => 'string', 'enum' => ['betrayal', 'alliance', 'conflict', 'revelation', 'sacrifice', 'manipulation', 'other']],
+                            'summary' => ['type' => 'string', 'description' => 'Shrnutí česky, 3. osoba, max 120 znaků'],
+                            'emotional_weight' => ['type' => 'integer', 'description' => 'Závažnost 1–10'],
+                            'participants' => [
+                                'type' => 'array',
+                                'items' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'player_index' => ['type' => 'integer'],
+                                        'role' => ['type' => 'string', 'enum' => ['initiator', 'target', 'witness']],
+                                    ],
+                                    'required' => ['player_index', 'role'],
+                                ],
+                            ],
+                        ],
+                        'required' => ['type', 'summary', 'emotional_weight', 'participants'],
+                    ],
+                ],
             ],
-            ['reasoning', 'player_location', 'players_nearby', 'macro_narrative', 'player_narrative', 'relationship_changes'],
+            ['reasoning', 'player_location', 'players_nearby', 'macro_narrative', 'player_narrative', 'relationship_changes', 'major_events'],
         );
     }
 
@@ -188,6 +224,7 @@ final readonly class SimulateTickOperation implements AiOperation
         $macroNarrative = $this->extractString($data, 'macro_narrative', $actionName, $content, self::MAX_MACRO_NARRATIVE_LENGTH);
         $playerNarrative = $this->extractString($data, 'player_narrative', $actionName, $content, self::MAX_PLAYER_NARRATIVE_LENGTH);
         $relationshipChanges = $this->extractRelationshipChanges($data, $playerCount, $actionName, $content);
+        $majorEvents = $this->extractMajorEvents($data, $playerCount);
 
         return new SimulateTickResult(
             $reasoning,
@@ -196,6 +233,7 @@ final readonly class SimulateTickOperation implements AiOperation
             $macroNarrative,
             $playerNarrative,
             $relationshipChanges,
+            $majorEvents,
         );
     }
 
@@ -236,6 +274,13 @@ final readonly class SimulateTickOperation implements AiOperation
                     $rel->getThreat(),
                 );
             }
+        }
+
+        // Player memories
+        $memorySection = $this->formatMemories();
+        if ($memorySection !== '') {
+            $parts[] = '';
+            $parts[] = $memorySection;
         }
 
         // Recent events
@@ -420,6 +465,149 @@ final readonly class SimulateTickOperation implements AiOperation
         }
 
         return implode("\n", $lines);
+    }
+
+    private function formatMemories(): string
+    {
+        $lines = ['=== PAMĚŤ HRÁČŮ ==='];
+
+        if ($this->memories === []) {
+            $lines[] = '(Zatím žádné zaznamenané vzpomínky — hra právě začala.)';
+
+            return implode("\n", $lines);
+        }
+
+        // Group memories by player index
+        /** @var array<int, array<int, SimulationMemoryInput>> $byPlayer */
+        $byPlayer = [];
+        foreach ($this->memories as $memory) {
+            $byPlayer[$memory->getPlayerIndex()][] = $memory;
+        }
+
+        // Build AI player lookup (index → name), skip human
+        $aiPlayerNames = [];
+        foreach ($this->players as $player) {
+            if ($player->isHuman()) {
+                continue;
+            }
+
+            $aiPlayerNames[$player->getIndex()] = $player->getName();
+        }
+
+        $hasContent = false;
+        foreach ($aiPlayerNames as $index => $name) {
+            if (!isset($byPlayer[$index])) {
+                $lines[] = sprintf('Hráč %d (%s): (žádné zaznamenané vzpomínky)', $index, $name);
+
+                continue;
+            }
+
+            $lines[] = sprintf('Hráč %d (%s) si pamatuje:', $index, $name);
+            $hasContent = true;
+
+            foreach ($byPlayer[$index] as $memory) {
+                $lines[] = sprintf(
+                    '- [Den %d, %02d:00] %s (role: %s, závažnost: %d)',
+                    $memory->getDay(),
+                    $memory->getHour(),
+                    $memory->getSummary(),
+                    $memory->getRole(),
+                    $memory->getEmotionalWeight(),
+                );
+            }
+        }
+
+        if (!$hasContent) {
+            return '=== PAMĚŤ HRÁČŮ ===' . "\n" . '(Zatím žádné zaznamenané vzpomínky — hra právě začala.)';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<int, MajorEventData>
+     */
+    private function extractMajorEvents(array $data, int $playerCount): array
+    {
+        if (!isset($data['major_events']) || !is_array($data['major_events'])) {
+            return [];
+        }
+
+        $validRoles = ['initiator', 'target', 'witness'];
+        $events = [];
+
+        foreach ($data['major_events'] as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            /** @var array<string, mixed> $item */
+            if (!isset($item['type']) || !is_string($item['type'])) {
+                continue;
+            }
+
+            if (!isset($item['summary']) || !is_string($item['summary'])) {
+                continue;
+            }
+
+            if (!isset($item['emotional_weight']) || !is_int($item['emotional_weight'])) {
+                continue;
+            }
+
+            $summary = mb_substr($item['summary'], 0, self::MAX_MAJOR_EVENT_SUMMARY_LENGTH);
+            $emotionalWeight = max(self::MIN_EMOTIONAL_WEIGHT, min(self::MAX_EMOTIONAL_WEIGHT, $item['emotional_weight']));
+
+            // Parse participants
+            $participants = [];
+            $seenPlayerIndices = [];
+
+            if (isset($item['participants']) && is_array($item['participants'])) {
+                foreach ($item['participants'] as $participant) {
+                    if (!is_array($participant)) {
+                        continue;
+                    }
+
+                    /** @var array<string, mixed> $participant */
+                    if (!isset($participant['player_index']) || !is_int($participant['player_index'])) {
+                        continue;
+                    }
+
+                    if (!isset($participant['role']) || !is_string($participant['role'])) {
+                        continue;
+                    }
+
+                    $playerIndex = $participant['player_index'];
+
+                    if ($playerIndex < 1 || $playerIndex > $playerCount) {
+                        continue;
+                    }
+
+                    if (!in_array($participant['role'], $validRoles, true)) {
+                        continue;
+                    }
+
+                    if (isset($seenPlayerIndices[$playerIndex])) {
+                        continue;
+                    }
+
+                    $seenPlayerIndices[$playerIndex] = true;
+                    $participants[] = new MajorEventParticipantData($playerIndex, $participant['role']);
+                }
+            }
+
+            if ($participants === []) {
+                continue;
+            }
+
+            $events[] = new MajorEventData($item['type'], $summary, $emotionalWeight, $participants);
+
+            if (count($events) >= self::MAX_MAJOR_EVENTS) {
+                break;
+            }
+        }
+
+        return $events;
     }
 
     /**

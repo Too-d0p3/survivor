@@ -16,6 +16,7 @@ use App\Domain\Game\Game;
 use App\Domain\Game\GameEvent;
 use App\Domain\Game\GameFacade;
 use App\Domain\Game\GameStatus;
+use App\Domain\Game\MajorEvent;
 use App\Domain\Relationship\Relationship;
 use App\Domain\TraitDef\TraitDef;
 use App\Domain\TraitDef\TraitType;
@@ -573,6 +574,45 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
         self::assertCount(1, $logs);
     }
 
+    public function testProcessTickCreatesMajorEventsInDatabase(): void
+    {
+        $this->setUpMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $gameFacade->processTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $majorEventRepository = $this->getEntityManager()->getRepository(MajorEvent::class);
+        $majorEvents = $majorEventRepository->findAll();
+
+        self::assertCount(1, $majorEvents);
+        self::assertSame('Alex a Bara uzavřeli alianci pro hlasování.', $majorEvents[0]->getSummary());
+        self::assertSame(7, $majorEvents[0]->getEmotionalWeight());
+        self::assertCount(2, $majorEvents[0]->getParticipants());
+    }
+
+    public function testProcessTickWithEmptyMajorEventsCreatesNone(): void
+    {
+        $this->setUpEmptyMajorEventsMockGeminiClient();
+        $this->seedTraitDefs();
+        $user = $this->createAndPersistUser();
+
+        $gameFacade = $this->getService(GameFacade::class);
+        $createResult = $gameFacade->createGame($user, 'Human', 'A strategic player', ['leadership' => '0.85']);
+        $gameFacade->startGame($createResult->game->getId(), $user);
+
+        $gameFacade->processTick($createResult->game->getId(), $user, 'Went fishing');
+
+        $majorEventRepository = $this->getEntityManager()->getRepository(MajorEvent::class);
+        $majorEvents = $majorEventRepository->findAll();
+
+        self::assertCount(0, $majorEvents);
+    }
+
     private function seedTraitDefs(): void
     {
         $entityManager = $this->getEntityManager();
@@ -667,6 +707,17 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
                             ['source_index' => 1, 'target_index' => 2, 'trust_delta' => 3, 'affinity_delta' => 2, 'respect_delta' => 0, 'threat_delta' => 0],
                             ['source_index' => 2, 'target_index' => 1, 'trust_delta' => 2, 'affinity_delta' => 1, 'respect_delta' => 1, 'threat_delta' => 0],
                         ],
+                        'major_events' => [
+                            [
+                                'type' => 'alliance',
+                                'summary' => 'Alex a Bara uzavřeli alianci pro hlasování.',
+                                'emotional_weight' => 7,
+                                'participants' => [
+                                    ['player_index' => 2, 'role' => 'initiator'],
+                                    ['player_index' => 3, 'role' => 'target'],
+                                ],
+                            ],
+                        ],
                     ], JSON_THROW_ON_ERROR),
                     new TokenUsage(300, 200, 500),
                     300,
@@ -744,6 +795,99 @@ final class GameFacadeTest extends AbstractIntegrationTestCase
                     json_encode(['relationships' => $relationships], JSON_THROW_ON_ERROR),
                     new TokenUsage(200, 100, 300),
                     200,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+        };
+
+        self::getContainer()->set(GeminiClient::class, $mockClient);
+    }
+
+    private function setUpEmptyMajorEventsMockGeminiClient(): void
+    {
+        $mockClient = new class implements GeminiClient {
+            private int $callCount = 0;
+
+            public function request(AiRequest $aiRequest): AiResponse
+            {
+                $this->callCount++;
+
+                if ($this->callCount === 1) {
+                    return $this->buildSummariesResponse();
+                }
+
+                if ($this->callCount === 2) {
+                    return $this->buildRelationshipsResponse();
+                }
+
+                return $this->buildSimulationResponse();
+            }
+
+            private function buildSummariesResponse(): AiResponse
+            {
+                $summaries = [];
+                for ($i = 1; $i <= 5; $i++) {
+                    $summaries[] = ['player_index' => $i, 'summary' => "AI player {$i} summary."];
+                }
+
+                return new AiResponse(
+                    json_encode(['summaries' => $summaries], JSON_THROW_ON_ERROR),
+                    new TokenUsage(100, 50, 150),
+                    200,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+
+            private function buildRelationshipsResponse(): AiResponse
+            {
+                $relationships = [];
+                $playerCount = 6;
+
+                for ($source = 1; $source <= $playerCount; $source++) {
+                    for ($target = 1; $target <= $playerCount; $target++) {
+                        if ($source === $target) {
+                            continue;
+                        }
+
+                        $relationships[] = [
+                            'source_index' => $source,
+                            'target_index' => $target,
+                            'trust' => 40 + $source + $target,
+                            'affinity' => 45 + $source,
+                            'respect' => 50 + $target,
+                            'threat' => 30 + $source * 2,
+                        ];
+                    }
+                }
+
+                return new AiResponse(
+                    json_encode(['relationships' => $relationships], JSON_THROW_ON_ERROR),
+                    new TokenUsage(200, 100, 300),
+                    200,
+                    'gemini-2.5-flash',
+                    '{"candidates": []}',
+                    'STOP',
+                );
+            }
+
+            private function buildSimulationResponse(): AiResponse
+            {
+                return new AiResponse(
+                    json_encode([
+                        'reasoning' => 'Klidný den na ostrově bez výrazných událostí.',
+                        'player_location' => 'tábor',
+                        'players_nearby' => [2],
+                        'macro_narrative' => 'Hráči relaxovali v táboře. Nic zásadního se nestalo. Zásoby byly rozděleny rovnoměrně.',
+                        'player_narrative' => 'Odpočíval jsi v táboře. Byl to klidný den bez konfliktů.',
+                        'relationship_changes' => [],
+                        'major_events' => [],
+                    ], JSON_THROW_ON_ERROR),
+                    new TokenUsage(300, 200, 500),
+                    300,
                     'gemini-2.5-flash',
                     '{"candidates": []}',
                     'STOP',

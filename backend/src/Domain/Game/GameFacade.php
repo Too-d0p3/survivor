@@ -48,6 +48,8 @@ final class GameFacade
 
     private readonly RelationshipRepository $relationshipRepository;
 
+    private readonly MajorEventRepository $majorEventRepository;
+
     public function __construct(
         EntityManagerInterface $entityManager,
         GameService $gameService,
@@ -60,6 +62,7 @@ final class GameFacade
         SimulationAiService $simulationAiService,
         SimulationService $simulationService,
         RelationshipRepository $relationshipRepository,
+        MajorEventRepository $majorEventRepository,
     ) {
         $this->entityManager = $entityManager;
         $this->gameService = $gameService;
@@ -72,6 +75,7 @@ final class GameFacade
         $this->simulationAiService = $simulationAiService;
         $this->simulationService = $simulationService;
         $this->relationshipRepository = $relationshipRepository;
+        $this->majorEventRepository = $majorEventRepository;
     }
 
     /**
@@ -203,11 +207,29 @@ final class GameFacade
         $fromTick = max(0, $currentTick - 3);
         $recentEvents = $this->gameEventRepository->findByGameFromTick($game->getId(), $fromTick);
 
+        // 3b. Load existing memories for context injection + dedup
+        $majorEventsByPlayerIndex = [];
+        $existingSummaries = [];
+        foreach (array_values($allPlayers) as $i => $player) {
+            $playerIndex = $i + 1;
+            $playerMajorEvents = $this->majorEventRepository->findByGameForPlayer(
+                $game->getId(),
+                $player->getId(),
+                5,
+            );
+            $majorEventsByPlayerIndex[$playerIndex] = $playerMajorEvents;
+            foreach ($playerMajorEvents as $me) {
+                $existingSummaries[] = $me->getSummary();
+            }
+        }
+        $existingSummaries = array_values(array_unique($existingSummaries));
+
         // 4. Build simulation context DTOs
         $playerInputs = SimulationContextBuilder::buildPlayerInputs($allPlayers);
         $relationshipInputs = SimulationContextBuilder::buildRelationshipInputs($allRelationships, $allPlayers);
         $eventInputs = SimulationContextBuilder::buildEventInputs($recentEvents, $allPlayers);
         $humanPlayerIndex = SimulationContextBuilder::findHumanPlayerIndex($allPlayers);
+        $memoryInputs = SimulationContextBuilder::buildMemoryInputs($majorEventsByPlayerIndex, $allPlayers);
 
         // 5. Run AI simulation
         $simulationServiceResult = $this->simulationAiService->simulateTick(
@@ -219,6 +241,7 @@ final class GameFacade
             $eventInputs,
             $humanPlayerIndex,
             $now,
+            $memoryInputs,
         );
 
         // 6. Always persist AI logs
@@ -245,6 +268,19 @@ final class GameFacade
             $now,
         );
 
+        // 8b. Extract major events from simulation result
+        $majorEventsResult = $this->simulationService->extractMajorEvents(
+            $game,
+            $simulationResult->events[0],
+            $simulationServiceResult->getResult()->getMajorEvents(),
+            $allPlayers,
+            $existingSummaries,
+            $currentDay,
+            $currentHour,
+            $currentTick,
+            $now,
+        );
+
         // 9. Advance game clock (may create NightSleep event)
         $clockEvents = $this->gameService->advanceGameClock($game, $now);
 
@@ -253,6 +289,14 @@ final class GameFacade
 
         foreach ($allEvents as $event) {
             $this->entityManager->persist($event);
+        }
+
+        // 10b. Persist major events
+        foreach ($majorEventsResult->majorEvents as $majorEvent) {
+            $this->entityManager->persist($majorEvent);
+            foreach ($majorEvent->getParticipants() as $participant) {
+                $this->entityManager->persist($participant);
+            }
         }
 
         $this->entityManager->flush();
@@ -289,10 +333,22 @@ final class GameFacade
         $fromTick = max(0, $currentTick - 3);
         $recentEvents = $this->gameEventRepository->findByGameFromTick($game->getId(), $fromTick);
 
+        // Load existing memories for context injection
+        $majorEventsByPlayerIndex = [];
+        foreach (array_values($allPlayers) as $i => $player) {
+            $playerIndex = $i + 1;
+            $majorEventsByPlayerIndex[$playerIndex] = $this->majorEventRepository->findByGameForPlayer(
+                $game->getId(),
+                $player->getId(),
+                5,
+            );
+        }
+
         $playerInputs = SimulationContextBuilder::buildPlayerInputs($allPlayers);
         $relationshipInputs = SimulationContextBuilder::buildRelationshipInputs($allRelationships, $allPlayers);
         $eventInputs = SimulationContextBuilder::buildEventInputs($recentEvents, $allPlayers);
         $humanPlayerIndex = SimulationContextBuilder::findHumanPlayerIndex($allPlayers);
+        $memoryInputs = SimulationContextBuilder::buildMemoryInputs($majorEventsByPlayerIndex, $allPlayers);
 
         $simulationServiceResult = $this->simulationAiService->simulateTick(
             $currentDay,
@@ -303,6 +359,7 @@ final class GameFacade
             $eventInputs,
             $humanPlayerIndex,
             $now,
+            $memoryInputs,
         );
 
         foreach ($simulationServiceResult->getLogs() as $log) {
