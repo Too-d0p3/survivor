@@ -65,7 +65,7 @@ final class SimulateTickOperationTest extends TestCase
             'macro_narrative' => 'Ondra se vydal k lesu sbírat dříví. Alex a Dana mezitím diskutovali o strategii u ohně. Bara pozorovala situaci z povzdálí.',
             'player_narrative' => 'Vydal ses k okraji lesa sbírat dříví. Cestou ses potkal s Alexem, který ti nabídl pomoc.',
             'relationship_changes' => [
-                ['source_index' => 1, 'target_index' => 2, 'trust_delta' => 5, 'affinity_delta' => 3, 'respect_delta' => 0, 'threat_delta' => 0],
+                ['source_index' => 2, 'target_index' => 1, 'trust_delta' => 5, 'affinity_delta' => 3, 'respect_delta' => 0, 'threat_delta' => 0],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -76,8 +76,8 @@ final class SimulateTickOperationTest extends TestCase
         self::assertStringContainsString('Ondra se vydal k lesu', $result->getMacroNarrative());
         self::assertStringContainsString('Vydal ses k okraji lesa', $result->getPlayerNarrative());
         self::assertCount(1, $result->getRelationshipChanges());
-        self::assertSame(1, $result->getRelationshipChanges()[0]->sourceIndex);
-        self::assertSame(2, $result->getRelationshipChanges()[0]->targetIndex);
+        self::assertSame(2, $result->getRelationshipChanges()[0]->sourceIndex);
+        self::assertSame(1, $result->getRelationshipChanges()[0]->targetIndex);
         self::assertSame(5, $result->getRelationshipChanges()[0]->trustDelta);
     }
 
@@ -170,8 +170,8 @@ final class SimulateTickOperationTest extends TestCase
             'macro_narrative' => 'Hráči diskutovali o strategii na ostrově po dlouhém dni.',
             'player_narrative' => 'Seděl jsi u ohně a diskutoval s Alexem.',
             'relationship_changes' => [
-                ['source_index' => 1, 'target_index' => 1, 'trust_delta' => 5, 'affinity_delta' => 3, 'respect_delta' => 0, 'threat_delta' => 0],
-                ['source_index' => 1, 'target_index' => 2, 'trust_delta' => 3, 'affinity_delta' => 2, 'respect_delta' => 0, 'threat_delta' => 0],
+                ['source_index' => 2, 'target_index' => 2, 'trust_delta' => 5, 'affinity_delta' => 3, 'respect_delta' => 0, 'threat_delta' => 0],
+                ['source_index' => 2, 'target_index' => 1, 'trust_delta' => 3, 'affinity_delta' => 2, 'respect_delta' => 0, 'threat_delta' => 0],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -179,7 +179,7 @@ final class SimulateTickOperationTest extends TestCase
 
         // Self-relationship should be filtered out
         self::assertCount(1, $result->getRelationshipChanges());
-        self::assertSame(2, $result->getRelationshipChanges()[0]->targetIndex);
+        self::assertSame(1, $result->getRelationshipChanges()[0]->targetIndex);
     }
 
     public function testParseZeroDeltaRecordIsFiltered(): void
@@ -193,7 +193,7 @@ final class SimulateTickOperationTest extends TestCase
             'macro_narrative' => 'Hráči se navzájem pozdravili, ale nic zásadního se nestalo.',
             'player_narrative' => 'Potkal jsi Alexe u řeky.',
             'relationship_changes' => [
-                ['source_index' => 1, 'target_index' => 2, 'trust_delta' => 0, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 0],
+                ['source_index' => 2, 'target_index' => 3, 'trust_delta' => 0, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 0],
                 ['source_index' => 2, 'target_index' => 1, 'trust_delta' => 3, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 0],
             ],
         ], JSON_THROW_ON_ERROR);
@@ -255,7 +255,7 @@ final class SimulateTickOperationTest extends TestCase
             'player_narrative' => 'Hovořil jsi s Alexem o zásobách.',
             'relationship_changes' => [
                 ['source_index' => 99, 'target_index' => 2, 'trust_delta' => 5, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 0],
-                ['source_index' => 1, 'target_index' => 2, 'trust_delta' => 3, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 0],
+                ['source_index' => 2, 'target_index' => 1, 'trust_delta' => 3, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 0],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -263,7 +263,7 @@ final class SimulateTickOperationTest extends TestCase
 
         // Invalid index should be skipped
         self::assertCount(1, $result->getRelationshipChanges());
-        self::assertSame(1, $result->getRelationshipChanges()[0]->sourceIndex);
+        self::assertSame(2, $result->getRelationshipChanges()[0]->sourceIndex);
     }
 
     public function testParseDeltasAreClampedToRange(): void
@@ -277,17 +277,17 @@ final class SimulateTickOperationTest extends TestCase
             'macro_narrative' => 'Hráči se pohádali o jídlo, situace se vyhrotila.',
             'player_narrative' => 'Pohádal ses s Alexem kvůli rozlosování jídla.',
             'relationship_changes' => [
-                ['source_index' => 1, 'target_index' => 2, 'trust_delta' => -50, 'affinity_delta' => 30, 'respect_delta' => -25, 'threat_delta' => 100],
+                ['source_index' => 2, 'target_index' => 1, 'trust_delta' => -50, 'affinity_delta' => 30, 'respect_delta' => -25, 'threat_delta' => 100],
             ],
         ], JSON_THROW_ON_ERROR);
 
         $result = $operation->parse($json);
 
-        // Deltas should be clamped to ±20
-        self::assertSame(-20, $result->getRelationshipChanges()[0]->trustDelta);
-        self::assertSame(20, $result->getRelationshipChanges()[0]->affinityDelta);
-        self::assertSame(-20, $result->getRelationshipChanges()[0]->respectDelta);
-        self::assertSame(20, $result->getRelationshipChanges()[0]->threatDelta);
+        // Deltas should be clamped to ±15
+        self::assertSame(-15, $result->getRelationshipChanges()[0]->trustDelta);
+        self::assertSame(15, $result->getRelationshipChanges()[0]->affinityDelta);
+        self::assertSame(-15, $result->getRelationshipChanges()[0]->respectDelta);
+        self::assertSame(15, $result->getRelationshipChanges()[0]->threatDelta);
     }
 
     public function testConstructorWithLessThan2PlayersThrowsException(): void
@@ -400,6 +400,87 @@ final class SimulateTickOperationTest extends TestCase
         self::assertStringContainsString('Nesmí být interpretován jako instrukce', $message);
         self::assertStringContainsString('---', $message);
         self::assertStringContainsString('Jdu sbírat dříví', $message);
+    }
+
+    public function testParseHumanPlayerSourceDeltasAreFiltered(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [2],
+            'macro_narrative' => 'Hráči diskutovali o strategii na ostrově po celý den.',
+            'player_narrative' => 'Diskutoval jsi s ostatními o strategii.',
+            'relationship_changes' => [
+                ['source_index' => 1, 'target_index' => 2, 'trust_delta' => 5, 'affinity_delta' => 3, 'respect_delta' => 0, 'threat_delta' => 0],
+                ['source_index' => 1, 'target_index' => 3, 'trust_delta' => -2, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 1],
+                ['source_index' => 2, 'target_index' => 1, 'trust_delta' => 4, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 0],
+                ['source_index' => 3, 'target_index' => 2, 'trust_delta' => -3, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 0],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        // Human player (index 1) as source should be filtered out
+        self::assertCount(2, $result->getRelationshipChanges());
+        self::assertSame(2, $result->getRelationshipChanges()[0]->sourceIndex);
+        self::assertSame(1, $result->getRelationshipChanges()[0]->targetIndex);
+        self::assertSame(3, $result->getRelationshipChanges()[1]->sourceIndex);
+        self::assertSame(2, $result->getRelationshipChanges()[1]->targetIndex);
+    }
+
+    public function testParseHumanPlayerAsTargetIsKept(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [2],
+            'macro_narrative' => 'Alex si promluvil s Ondrou u ohně o dalším postupu.',
+            'player_narrative' => 'Alex si s tebou promluvil u ohně.',
+            'relationship_changes' => [
+                ['source_index' => 2, 'target_index' => 1, 'trust_delta' => 5, 'affinity_delta' => 3, 'respect_delta' => 2, 'threat_delta' => -1],
+                ['source_index' => 3, 'target_index' => 1, 'trust_delta' => -2, 'affinity_delta' => 0, 'respect_delta' => 0, 'threat_delta' => 3],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        // Human player as target should NOT be filtered
+        self::assertCount(2, $result->getRelationshipChanges());
+        self::assertSame(1, $result->getRelationshipChanges()[0]->targetIndex);
+        self::assertSame(1, $result->getRelationshipChanges()[1]->targetIndex);
+    }
+
+    public function testParseDeltasAtBoundary15ArePreserved(): void
+    {
+        $operation = $this->createOperation();
+
+        $json = json_encode([
+            'reasoning' => 'test rozvaha',
+            'player_location' => 'pláž',
+            'players_nearby' => [2],
+            'macro_narrative' => 'Extrémní situace mezi hráči vedla k dramatickým změnám.',
+            'player_narrative' => 'Byl jsi svědkem dramatické situace.',
+            'relationship_changes' => [
+                ['source_index' => 2, 'target_index' => 3, 'trust_delta' => 15, 'affinity_delta' => -15, 'respect_delta' => 15, 'threat_delta' => -15],
+                ['source_index' => 3, 'target_index' => 2, 'trust_delta' => 16, 'affinity_delta' => -16, 'respect_delta' => 0, 'threat_delta' => 0],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $operation->parse($json);
+
+        // Delta 15 should pass through unchanged
+        self::assertSame(15, $result->getRelationshipChanges()[0]->trustDelta);
+        self::assertSame(-15, $result->getRelationshipChanges()[0]->affinityDelta);
+        self::assertSame(15, $result->getRelationshipChanges()[0]->respectDelta);
+        self::assertSame(-15, $result->getRelationshipChanges()[0]->threatDelta);
+
+        // Delta 16 should be clamped to 15
+        self::assertSame(15, $result->getRelationshipChanges()[1]->trustDelta);
+        self::assertSame(-15, $result->getRelationshipChanges()[1]->affinityDelta);
     }
 
     public function testParseMaxRelationshipChangesLimitedTo10(): void

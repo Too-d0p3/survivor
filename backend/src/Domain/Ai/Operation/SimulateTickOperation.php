@@ -18,6 +18,13 @@ use JsonException;
  */
 final readonly class SimulateTickOperation implements AiOperation
 {
+    private const int MAX_RELATIONSHIP_DELTA = 15;
+    private const int MAX_RELATIONSHIP_CHANGES = 10;
+    private const int MAX_REASONING_LENGTH = 500;
+    private const int MAX_PLAYER_LOCATION_LENGTH = 80;
+    private const int MAX_MACRO_NARRATIVE_LENGTH = 900;
+    private const int MAX_PLAYER_NARRATIVE_LENGTH = 500;
+
     private int $day;
 
     private int $hour;
@@ -125,10 +132,10 @@ final readonly class SimulateTickOperation implements AiOperation
                         'properties' => [
                             'source_index' => ['type' => 'integer', 'description' => '1-based index zdrojového hráče'],
                             'target_index' => ['type' => 'integer', 'description' => '1-based index cílového hráče'],
-                            'trust_delta' => ['type' => 'integer', 'description' => 'Změna důvěry (±20)'],
-                            'affinity_delta' => ['type' => 'integer', 'description' => 'Změna sympatií (±20)'],
-                            'respect_delta' => ['type' => 'integer', 'description' => 'Změna respektu (±20)'],
-                            'threat_delta' => ['type' => 'integer', 'description' => 'Změna vnímané hrozby (±20)'],
+                            'trust_delta' => ['type' => 'integer', 'description' => 'Změna důvěry (±15)'],
+                            'affinity_delta' => ['type' => 'integer', 'description' => 'Změna sympatií (±15)'],
+                            'respect_delta' => ['type' => 'integer', 'description' => 'Změna respektu (±15)'],
+                            'threat_delta' => ['type' => 'integer', 'description' => 'Změna vnímané hrozby (±15)'],
                         ],
                         'required' => ['source_index', 'target_index', 'trust_delta', 'affinity_delta', 'respect_delta', 'threat_delta'],
                     ],
@@ -168,11 +175,11 @@ final readonly class SimulateTickOperation implements AiOperation
         }
 
         /** @var array<string, mixed> $data */
-        $reasoning = $this->extractString($data, 'reasoning', $actionName, $content, 500);
-        $playerLocation = $this->extractString($data, 'player_location', $actionName, $content, 80);
+        $reasoning = $this->extractString($data, 'reasoning', $actionName, $content, self::MAX_REASONING_LENGTH);
+        $playerLocation = $this->extractString($data, 'player_location', $actionName, $content, self::MAX_PLAYER_LOCATION_LENGTH);
         $playersNearby = $this->extractPlayersNearby($data, $playerCount, $actionName, $content);
-        $macroNarrative = $this->extractString($data, 'macro_narrative', $actionName, $content, 1200);
-        $playerNarrative = $this->extractString($data, 'player_narrative', $actionName, $content, 800);
+        $macroNarrative = $this->extractString($data, 'macro_narrative', $actionName, $content, self::MAX_MACRO_NARRATIVE_LENGTH);
+        $playerNarrative = $this->extractString($data, 'player_narrative', $actionName, $content, self::MAX_PLAYER_NARRATIVE_LENGTH);
         $relationshipChanges = $this->extractRelationshipChanges($data, $playerCount, $actionName, $content);
 
         return new SimulateTickResult(
@@ -385,6 +392,10 @@ final readonly class SimulateTickOperation implements AiOperation
                 continue;
             }
 
+            if ($sourceIndex === $this->humanPlayerIndex) {
+                continue;
+            }
+
             $trustDelta = $this->extractDelta($item, 'trust_delta');
             $affinityDelta = $this->extractDelta($item, 'affinity_delta');
             $respectDelta = $this->extractDelta($item, 'respect_delta');
@@ -404,7 +415,7 @@ final readonly class SimulateTickOperation implements AiOperation
                 $threatDelta,
             );
 
-            if (count($changes) >= 10) {
+            if (count($changes) >= self::MAX_RELATIONSHIP_CHANGES) {
                 break;
             }
         }
@@ -439,6 +450,6 @@ final readonly class SimulateTickOperation implements AiOperation
             return 0;
         }
 
-        return max(-20, min(20, $item[$field]));
+        return max(-self::MAX_RELATIONSHIP_DELTA, min(self::MAX_RELATIONSHIP_DELTA, $item[$field]));
     }
 }
