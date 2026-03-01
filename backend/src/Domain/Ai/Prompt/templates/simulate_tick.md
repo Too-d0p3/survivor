@@ -28,9 +28,33 @@ Tvým úkolem je simulovat, co se stalo na ostrově během tohoto časového ús
 
 ### Autonomie AI hráčů
 
-- AI hráči jsou autonomní agenti. Během každého ticku MUSÍ existovat alespoň 1 interakce, která se lidského hráče NETÝKÁ (AI-AI interakce).
-- I když lidský hráč udělá něco dramatického, ostatní hráči na to později reagují MEZI SEBOU (diskutují, tvoří aliance, plánují).
-- V macro_narrative popiš alespoň jednu AI-AI interakci.
+AI hráči jsou autonomní agenti s vlastními cíli. NEJSOU kulisy pro lidského hráče.
+
+**Povinné minimum:**
+- Každý tick MUSÍ obsahovat alespoň jednu PROAKTIVNÍ AI-AI scénu, kde AI hráči jednají z VLASTNÍ iniciativy (ne jako reakce na lidského hráče).
+- Proaktivní scéna musí obsahovat konkrétní dialog nebo akci s viditelným výsledkem (dohoda, spor, objev, plán).
+
+**ZAKÁZANÉ vzory (reaktivní, líné AI-AI interakce):**
+- "Vyměnili si pohledy" / "sdíleli tiché porozumění" / "přikývli na sebe" — toto NENÍ interakce.
+- Jakákoli AI-AI scéna, která pouze komentuje nebo reaguje na akci lidského hráče bez vlastního cíle.
+
+**Odvození agendy z vlastností:**
+- Hráč s `strategic` > 0.7 → aktivně plánuje aliance, navrhuje spolupráci, zvažuje eliminaci hrozeb.
+- Hráč s `manipulative` > 0.7 → rozséva nedůvěru, šíří polopravdy, štve hráče proti sobě.
+- Hráč s `paranoid` > 0.6 → vyšetřuje, ptá se, hledá důkazy zrady, konfrontuje podezřelé.
+- Hráč s `leader` > 0.7 → organizuje skupinu, navrhuje pravidla, přebírá iniciativu.
+- Hráč s `treacherous` > 0.7 → hledá příležitost ke zradě, jedná za zády spojenců.
+- Hráč s `naive` > 0.7 → důvěřuje příliš snadno, sdílí informace, které neměl.
+
+**Pravidlo rovnováhy:** Maximálně 50 % textu macro_narrative smí být reakcí na akci lidského hráče. Zbytek musí být autonomní AI-AI aktivita.
+
+**Příklady DOBRÝCH AI-AI interakcí:**
+- "Emil si vzal Baru stranou a navrhl, že by měli hlasovat proti Alexovi. Bara váhala, ale nakonec souhlasila pod podmínkou, že Emil zajistí Cyrilovu podporu."
+- "Dana konfrontovala Cyrila s tím, co slyšela od Alexe. Cyril to popřel a obvinil Alexe z manipulace."
+
+**Příklady ŠPATNÝCH AI-AI interakcí (ZAKÁZÁNO):**
+- "Emil a Bara se podívali na sebe a sdíleli tiché porozumění."
+- "Ostatní hráči diskutovali o tom, co udělal lidský hráč."
 
 ### Závazné rozsahy pro změny vztahů
 

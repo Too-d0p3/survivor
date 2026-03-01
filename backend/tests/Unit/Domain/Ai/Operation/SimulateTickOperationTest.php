@@ -518,6 +518,117 @@ final class SimulateTickOperationTest extends TestCase
         self::assertCount(10, $result->getRelationshipChanges());
     }
 
+    public function testFormatMessageContainsBackstageHighThreat(): void
+    {
+        $players = $this->createPlayers(3);
+        $relationships = [
+            new SimulationRelationshipInput(2, 3, 50, 50, 50, 72),
+        ];
+
+        $operation = new SimulateTickOperation(1, 8, 'Jdu sbírat dříví', $players, $relationships, [], 1);
+        $message = $operation->formatMessage();
+
+        self::assertStringContainsString('ZÁKULISNÍ DYNAMIKA', $message);
+        self::assertStringContainsString('vnímá', $message);
+        self::assertStringContainsString('jako hrozbu', $message);
+    }
+
+    public function testFormatMessageContainsBackstageLowTrust(): void
+    {
+        $players = $this->createPlayers(3);
+        $relationships = [
+            new SimulationRelationshipInput(2, 3, 25, 50, 50, 30),
+        ];
+
+        $operation = new SimulateTickOperation(1, 8, 'Jdu sbírat dříví', $players, $relationships, [], 1);
+        $message = $operation->formatMessage();
+
+        self::assertStringContainsString('ZÁKULISNÍ DYNAMIKA', $message);
+        self::assertStringContainsString('nedůvěřuje', $message);
+    }
+
+    public function testFormatMessageContainsBackstageMutualHighTrust(): void
+    {
+        $players = $this->createPlayers(3);
+        $relationships = [
+            new SimulationRelationshipInput(2, 3, 78, 50, 50, 30),
+            new SimulationRelationshipInput(3, 2, 75, 50, 50, 30),
+        ];
+
+        $operation = new SimulateTickOperation(1, 8, 'Jdu sbírat dříví', $players, $relationships, [], 1);
+        $message = $operation->formatMessage();
+
+        self::assertStringContainsString('si navzájem důvěřují', $message);
+        // The pair should only appear once (deduplicated)
+        self::assertSame(1, substr_count($message, 'si navzájem důvěřují'));
+    }
+
+    public function testFormatMessageContainsBackstageTraitAgenda(): void
+    {
+        $players = $this->createPlayersWithTraits(3, [
+            1 => ['strategic' => '0.85', 'paranoid' => '0.65', 'leader' => '0.80'],
+        ]);
+        // Need at least one AI-AI relationship so formatBackstageContext doesn't early-return
+        $relationships = [
+            new SimulationRelationshipInput(2, 3, 50, 50, 50, 30),
+        ];
+
+        $operation = new SimulateTickOperation(1, 8, 'Jdu sbírat dříví', $players, $relationships, [], 1);
+        $message = $operation->formatMessage();
+
+        self::assertStringContainsString('ZÁKULISNÍ DYNAMIKA', $message);
+        self::assertStringContainsString('plánuje strategický tah', $message);
+        self::assertStringContainsString('podezřívavý', $message);
+        self::assertStringContainsString('přebírat iniciativu', $message);
+    }
+
+    public function testFormatMessageBackstageExcludesHumanRelationships(): void
+    {
+        // Only human→AI relationship with high threat, no AI-AI relationships with notable values
+        $players = $this->createPlayersWithTraits(3, [
+            1 => ['loyal' => '0.50', 'strategic' => '0.50'],
+        ]);
+        $relationships = [
+            new SimulationRelationshipInput(1, 2, 50, 50, 50, 80),
+        ];
+
+        $operation = new SimulateTickOperation(1, 8, 'Jdu sbírat dříví', $players, $relationships, [], 1);
+        $message = $operation->formatMessage();
+
+        // No AI-AI insights, no relevant traits → no backstage section
+        self::assertStringNotContainsString('ZÁKULISNÍ DYNAMIKA', $message);
+    }
+
+    public function testFormatMessageBackstageEmptyWhenNoRelationships(): void
+    {
+        $players = $this->createPlayersWithTraits(3, [
+            1 => ['loyal' => '0.50', 'strategic' => '0.50'],
+        ]);
+
+        $operation = new SimulateTickOperation(1, 8, 'Jdu sbírat dříví', $players, [], [], 1);
+        $message = $operation->formatMessage();
+
+        self::assertStringNotContainsString('ZÁKULISNÍ DYNAMIKA', $message);
+    }
+
+    public function testFormatMessageBackstageAppearsBeforeHumanAction(): void
+    {
+        $players = $this->createPlayers(3);
+        $relationships = [
+            new SimulationRelationshipInput(2, 3, 50, 50, 50, 72),
+        ];
+
+        $operation = new SimulateTickOperation(1, 8, 'Jdu sbírat dříví', $players, $relationships, [], 1);
+        $message = $operation->formatMessage();
+
+        $backstagePos = strpos($message, 'ZÁKULISNÍ DYNAMIKA');
+        $humanActionPos = strpos($message, 'AKCE LIDSKÉHO HRÁČE');
+
+        self::assertNotFalse($backstagePos);
+        self::assertNotFalse($humanActionPos);
+        self::assertLessThan($humanActionPos, $backstagePos);
+    }
+
     private function createOperation(): SimulateTickOperation
     {
         return new SimulateTickOperation(
@@ -558,6 +669,30 @@ final class SimulateTickOperationTest extends TestCase
                 $names[$i] ?? 'Player' . ($i + 1),
                 'Popis hráče ' . ($names[$i] ?? $i + 1),
                 ['loyal' => '0.72', 'strategic' => '0.85'],
+                $i === 0,
+            );
+        }
+
+        return $players;
+    }
+
+    /**
+     * @param array<int, array<string, string>> $traitOverrides 0-based index → traits
+     * @return array<int, SimulationPlayerInput>
+     */
+    private function createPlayersWithTraits(int $count, array $traitOverrides = []): array
+    {
+        $names = ['Ondra', 'Alex', 'Bara', 'Cyril', 'Dana', 'Emil'];
+        $defaultTraits = ['loyal' => '0.50', 'strategic' => '0.50'];
+        $players = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $traits = $traitOverrides[$i] ?? $defaultTraits;
+            $players[] = new SimulationPlayerInput(
+                $i + 1,
+                $names[$i] ?? 'Player' . ($i + 1),
+                'Popis hráče ' . ($names[$i] ?? $i + 1),
+                $traits,
                 $i === 0,
             );
         }

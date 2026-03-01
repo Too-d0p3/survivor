@@ -24,6 +24,13 @@ final readonly class SimulateTickOperation implements AiOperation
     private const int MAX_PLAYER_LOCATION_LENGTH = 80;
     private const int MAX_MACRO_NARRATIVE_LENGTH = 900;
     private const int MAX_PLAYER_NARRATIVE_LENGTH = 500;
+    private const int BACKSTAGE_HIGH_THREAT_THRESHOLD = 60;
+    private const int BACKSTAGE_LOW_TRUST_THRESHOLD = 30;
+    private const int BACKSTAGE_MUTUAL_HIGH_TRUST_THRESHOLD = 70;
+    private const float BACKSTAGE_STRATEGIC_TRAIT_THRESHOLD = 0.7;
+    private const float BACKSTAGE_MANIPULATIVE_TRAIT_THRESHOLD = 0.7;
+    private const float BACKSTAGE_PARANOID_TRAIT_THRESHOLD = 0.6;
+    private const float BACKSTAGE_LEADER_TRAIT_THRESHOLD = 0.7;
 
     private int $day;
 
@@ -240,6 +247,13 @@ final readonly class SimulateTickOperation implements AiOperation
             }
         }
 
+        // Backstage context (AI-AI dynamics)
+        $backstageContext = $this->formatBackstageContext();
+        if ($backstageContext !== '') {
+            $parts[] = '';
+            $parts[] = $backstageContext;
+        }
+
         // Human player action with injection guardrails
         $humanPlayerName = $this->findHumanPlayerName();
         $parts[] = '';
@@ -293,6 +307,119 @@ final readonly class SimulateTickOperation implements AiOperation
         }
 
         return '?';
+    }
+
+    private function formatBackstageContext(): string
+    {
+        if ($this->relationships === []) {
+            return '';
+        }
+
+        // Build AI player lookup (index → player)
+        $aiPlayers = [];
+        foreach ($this->players as $player) {
+            if ($player->isHuman()) {
+                continue;
+            }
+
+            $aiPlayers[$player->getIndex()] = $player;
+        }
+
+        $insights = [];
+
+        // Scan AI-AI relationships
+        /** @var array<string, int> $highTrustSeen first-seen trust value per pair key */
+        $highTrustSeen = [];
+
+        foreach ($this->relationships as $rel) {
+            $sourceIndex = $rel->getSourceIndex();
+            $targetIndex = $rel->getTargetIndex();
+
+            // Exclude relationships involving human player
+            if ($sourceIndex === $this->humanPlayerIndex || $targetIndex === $this->humanPlayerIndex) {
+                continue;
+            }
+
+            // Skip if either player is not in AI lookup (shouldn't happen, but safety)
+            if (!isset($aiPlayers[$sourceIndex]) || !isset($aiPlayers[$targetIndex])) {
+                continue;
+            }
+
+            $sourceName = $aiPlayers[$sourceIndex]->getName();
+            $targetName = $aiPlayers[$targetIndex]->getName();
+
+            // High threat detection
+            if ($rel->getThreat() > self::BACKSTAGE_HIGH_THREAT_THRESHOLD) {
+                $insights[] = sprintf('%s vnímá %s jako hrozbu (hrozba: %d)', $sourceName, $targetName, $rel->getThreat());
+            }
+
+            // Low trust detection
+            if ($rel->getTrust() < self::BACKSTAGE_LOW_TRUST_THRESHOLD) {
+                $insights[] = sprintf('%s nedůvěřuje %s (důvěra: %d)', $sourceName, $targetName, $rel->getTrust());
+            }
+
+            // Mutual high trust detection (deduplicated via pair key)
+            if ($rel->getTrust() <= self::BACKSTAGE_MUTUAL_HIGH_TRUST_THRESHOLD) {
+                continue;
+            }
+
+            $minIndex = min($sourceIndex, $targetIndex);
+            $maxIndex = max($sourceIndex, $targetIndex);
+            $pairKey = $minIndex . '-' . $maxIndex;
+
+            if (isset($highTrustSeen[$pairKey])) {
+                // Both directions have high trust — emit mutual trust insight
+                $firstTrust = $highTrustSeen[$pairKey];
+                $secondTrust = $rel->getTrust();
+                // Order: min→max trust / max→min trust
+                $trustA2B = $sourceIndex === $minIndex ? $secondTrust : $firstTrust;
+                $trustB2A = $sourceIndex === $minIndex ? $firstTrust : $secondTrust;
+                $insights[] = sprintf(
+                    '%s a %s si navzájem důvěřují (důvěra: %d/%d). Mohou koordinovat kroky.',
+                    $aiPlayers[$minIndex]->getName(),
+                    $aiPlayers[$maxIndex]->getName(),
+                    $trustA2B,
+                    $trustB2A,
+                );
+            } else {
+                $highTrustSeen[$pairKey] = $rel->getTrust();
+            }
+        }
+
+        // Scan AI player traits for agenda
+        foreach ($aiPlayers as $player) {
+            $traits = $player->getTraitStrengths();
+            $name = $player->getName();
+
+            if (isset($traits['strategic']) && (float) $traits['strategic'] >= self::BACKSTAGE_STRATEGIC_TRAIT_THRESHOLD) {
+                $insights[] = sprintf('%s (strategic %.2f) — aktivně plánuje strategický tah', $name, (float) $traits['strategic']);
+            }
+
+            if (isset($traits['manipulative']) && (float) $traits['manipulative'] >= self::BACKSTAGE_MANIPULATIVE_TRAIT_THRESHOLD) {
+                $insights[] = sprintf('%s (manipulative %.2f) — hledá příležitost k manipulaci', $name, (float) $traits['manipulative']);
+            }
+
+            if (isset($traits['paranoid']) && (float) $traits['paranoid'] >= self::BACKSTAGE_PARANOID_TRAIT_THRESHOLD) {
+                $insights[] = sprintf('%s (paranoid %.2f) — je podezřívavý, hledá důkazy zrady', $name, (float) $traits['paranoid']);
+            }
+
+            if (!isset($traits['leader']) || (float) $traits['leader'] < self::BACKSTAGE_LEADER_TRAIT_THRESHOLD) {
+                continue;
+            }
+
+            $insights[] = sprintf('%s (leader %.2f) — snaží se přebírat iniciativu a organizovat', $name, (float) $traits['leader']);
+        }
+
+        if ($insights === []) {
+            return '';
+        }
+
+        $lines = ['=== ZÁKULISNÍ DYNAMIKA (AI-AI) ==='];
+        foreach ($insights as $insight) {
+            $lines[] = '- ' . $insight;
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
